@@ -1,0 +1,168 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63f6ceb75ad944049a1c3d7d42c250d4, type: 3}
+  m_Name: 14
+  m_EditorClassIdentifier: Assembly-CSharp::BoardManager
+  boardSize: 14
+  cornerTile:
+    tileName: Corner
+    zone: 0
+    effect: 
+  defaultTilePrefab: {fileID: 7741288560753764945, guid: 13c96cf0287fa8c4fbff22f802c42e46, type: 3}
+  startDeck:
+  - tileName: Start_0
+    zone: 1
+    effect: 
+  - tileName: Start_1
+    zone: 1
+    effect: 
+  - tileName: Start_2
+    zone: 1
+    effect: 
+  - tileName: Start_3
+    zone: 1
+    effect: 
+  - tileName: Start_4
+    zone: 1
+    effect: 
+  - tileName: Start_5
+    zone: 1
+    effect: 
+  - tileName: Start_6
+    zone: 1
+    effect: 
+  - tileName: Start_7
+    zone: 1
+    effect: 
+  - tileName: Start_8
+    zone: 1
+    effect: 
+  - tileName: Start_9
+    zone: 1
+    effect: 
+  - tileName: Start_10
+    zone: 1
+    effect: 
+  - tileName: Start_11
+    zone: 1
+    effect: 
+  progressDeck:
+  - tileName: Progress_0
+    zone: 2
+    effect: 
+  - tileName: Progress_1
+    zone: 2
+    effect: 
+  - tileName: Progress_2
+    zone: 2
+    effect: 
+  - tileName: Progress_3
+    zone: 2
+    effect: 
+  - tileName: Progress_4
+    zone: 2
+    effect: 
+  - tileName: Progress_5
+    zone: 2
+    effect: 
+  - tileName: Progress_6
+    zone: 2
+    effect: 
+  - tileName: Progress_7
+    zone: 2
+    effect: 
+  - tileName: Progress_8
+    zone: 2
+    effect: 
+  - tileName: Progress_9
+    zone: 2
+    effect: 
+  - tileName: Progress_10
+    zone: 2
+    effect: 
+  - tileName: Progress_11
+    zone: 2
+    effect: 
+  triumphDeck:
+  - tileName: Triumph_0
+    zone: 3
+    effect: 
+  - tileName: Triumph_1
+    zone: 3
+    effect: 
+  - tileName: Triumph_2
+    zone: 3
+    effect: 
+  - tileName: Triumph_3
+    zone: 3
+    effect: 
+  - tileName: Triumph_4
+    zone: 3
+    effect: 
+  - tileName: Triumph_5
+    zone: 3
+    effect: 
+  - tileName: Triumph_6
+    zone: 3
+    effect: 
+  - tileName: Triumph_7
+    zone: 3
+    effect: 
+  - tileName: Triumph_8
+    zone: 3
+    effect: 
+  - tileName: Triumph_9
+    zone: 3
+    effect: 
+  - tileName: Triumph_10
+    zone: 3
+    effect: 
+  - tileName: Triumph_11
+    zone: 3
+    effect: 
+  finishDeck:
+  - tileName: Finish_0
+    zone: 4
+    effect: 
+  - tileName: Finish_1
+    zone: 4
+    effect: 
+  - tileName: Finish_2
+    zone: 4
+    effect: 
+  - tileName: Finish_3
+    zone: 4
+    effect: 
+  - tileName: Finish_4
+    zone: 4
+    effect: 
+  - tileName: Finish_5
+    zone: 4
+    effect: 
+  - tileName: Finish_6
+    zone: 4
+    effect: 
+  - tileName: Finish_7
+    zone: 4
+    effect: 
+  - tileName: Finish_8
+    zone: 4
+    effect: 
+  - tileName: Finish_9
+    zone: 4
+    effect: 
+  - tileName: Finish_10
+    zone: 4
+    effect: 
+  - tileName: Finish_11
+    zone: 4
+    effect: 
