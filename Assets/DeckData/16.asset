@@ -10,11 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 63f6ceb75ad944049a1c3d7d42c250d4, type: 3}
-  m_Name: 10
+  m_Name: 16
   m_EditorClassIdentifier: Assembly-CSharp::BoardManager
-  boardSize: 10
-  defaultTilePrefab: {fileID: 7741288560753764945, guid: a7a9b14a5d364c94da741f40e9b9de04, type: 3}
-  cornerTilePrefab: {fileID: 7741288560753764945, guid: 13c96cf0287fa8c4fbff22f802c42e46, type: 3}
+  boardSize: 16
+  cornerTile:
+    tileName: Corner
+    zone: 0
+    effect: 
+  defaultTilePrefab: {fileID: 7741288560753764945, guid: 13c96cf0287fa8c4fbff22f802c42e46, type: 3}
   startDeck:
   - tileName: Start_0
     zone: 1
@@ -38,6 +41,24 @@ MonoBehaviour:
     zone: 1
     effect: 
   - tileName: Start_7
+    zone: 1
+    effect: 
+  - tileName: Start_8
+    zone: 1
+    effect: 
+  - tileName: Start_9
+    zone: 1
+    effect: 
+  - tileName: Start_10
+    zone: 1
+    effect: 
+  - tileName: Start_11
+    zone: 1
+    effect: 
+  - tileName: Start_12
+    zone: 1
+    effect: 
+  - tileName: Start_13
     zone: 1
     effect: 
   progressDeck:
@@ -65,6 +86,24 @@ MonoBehaviour:
   - tileName: Progress_7
     zone: 2
     effect: 
+  - tileName: Progress_8
+    zone: 2
+    effect: 
+  - tileName: Progress_9
+    zone: 2
+    effect: 
+  - tileName: Progress_10
+    zone: 2
+    effect: 
+  - tileName: Progress_11
+    zone: 2
+    effect: 
+  - tileName: Progress_12
+    zone: 2
+    effect: 
+  - tileName: Progress_13
+    zone: 2
+    effect: 
   triumphDeck:
   - tileName: Triumph_0
     zone: 3
@@ -90,6 +129,24 @@ MonoBehaviour:
   - tileName: Triumph_7
     zone: 3
     effect: 
+  - tileName: Triumph_8
+    zone: 3
+    effect: 
+  - tileName: Triumph_9
+    zone: 3
+    effect: 
+  - tileName: Triumph_10
+    zone: 3
+    effect: 
+  - tileName: Triumph_11
+    zone: 3
+    effect: 
+  - tileName: Triumph_12
+    zone: 3
+    effect: 
+  - tileName: Triumph_13
+    zone: 3
+    effect: 
   finishDeck:
   - tileName: Finish_0
     zone: 4
@@ -113,5 +170,23 @@ MonoBehaviour:
     zone: 4
     effect: 
   - tileName: Finish_7
+    zone: 4
+    effect: 
+  - tileName: Finish_8
+    zone: 4
+    effect: 
+  - tileName: Finish_9
+    zone: 4
+    effect: 
+  - tileName: Finish_10
+    zone: 4
+    effect: 
+  - tileName: Finish_11
+    zone: 4
+    effect: 
+  - tileName: Finish_12
+    zone: 4
+    effect: 
+  - tileName: Finish_13
     zone: 4
     effect: 

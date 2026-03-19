@@ -6,15 +6,16 @@ public class BoardManager : ScriptableObject
 {
     public int boardSize = 10;
 
-    public TileData cornerTile;          // данные угловой плитки
-    public GameObject defaultTilePrefab; // визуальный префаб для всех плиток
+    // Два отдельных префаба
+    public GameObject defaultTilePrefab;
+    public GameObject cornerTilePrefab;
 
     public List<TileData> startDeck = new List<TileData>();
     public List<TileData> progressDeck = new List<TileData>();
     public List<TileData> triumphDeck = new List<TileData>();
     public List<TileData> finishDeck = new List<TileData>();
 
-    // Генерация стандартной колоды (если нужно)
+    // Генерация стандартной колоды
     public void GenerateDecks()
     {
         int tilesPerZone = boardSize - 2;
@@ -33,16 +34,15 @@ public class BoardManager : ScriptableObject
         }
     }
 
-    // Получение колоды по зоне
     public List<TileData> GetDeck(TileZone zone)
     {
-        switch (zone)
+        return zone switch
         {
-            case TileZone.Start: return startDeck;
-            case TileZone.Progress: return progressDeck;
-            case TileZone.Triumph: return triumphDeck;
-            case TileZone.Finish: return finishDeck;
-            default: return null;
-        }
+            TileZone.Start => startDeck,
+            TileZone.Progress => progressDeck,
+            TileZone.Triumph => triumphDeck,
+            TileZone.Finish => finishDeck,
+            _ => null
+        };
     }
 }

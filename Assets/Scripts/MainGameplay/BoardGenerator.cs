@@ -6,6 +6,23 @@ public class BoardGenerator : MonoBehaviour
     public float tileSize = 1f;
     public BoardManager boardManager;
     public GameObject tilePrefab; // визуальный префаб плитки
+    public List<Vector2Int> Path => path; // публично путь для фигур
+    private List<TileInstance> spawnedTiles = new List<TileInstance>();
+
+    public Vector3 GetWorldPosition(int index)
+    {
+        if (index < 0 || index >= spawnedTiles.Count) return Vector3.zero;
+        return spawnedTiles[index].transform.position;
+    }
+
+    public TileInstance GetTileInstance(int index)
+    {
+        if (index < 0 || index >= spawnedTiles.Count) return null;
+        return spawnedTiles[index];
+    }
+
+    [Range(0.5f, 1f)]
+    public float boardPadding = 0.9f;
 
     private List<Vector2Int> path = new List<Vector2Int>();
 
@@ -16,6 +33,8 @@ public class BoardGenerator : MonoBehaviour
             Debug.LogError("BoardManager не назначен!");
             return;
         }
+
+        FitBoardToCamera();
 
         GeneratePath(boardManager.boardSize);
         SpawnBoard();
@@ -49,34 +68,48 @@ public class BoardGenerator : MonoBehaviour
 
     void SpawnBoard()
     {
-        // Перемешанные копии колод
+        Vector3 offset = GetBoardOffset();
+
         var decksShuffled = new Dictionary<TileZone, List<TileData>>()
-        {
-            { TileZone.Start, ShuffleList(new List<TileData>(boardManager.startDeck)) },
-            { TileZone.Progress, ShuffleList(new List<TileData>(boardManager.progressDeck)) },
-            { TileZone.Triumph, ShuffleList(new List<TileData>(boardManager.triumphDeck)) },
-            { TileZone.Finish, ShuffleList(new List<TileData>(boardManager.finishDeck)) }
-        };
+    {
+        { TileZone.Start, ShuffleList(new List<TileData>(boardManager.startDeck)) },
+        { TileZone.Progress, ShuffleList(new List<TileData>(boardManager.progressDeck)) },
+        { TileZone.Triumph, ShuffleList(new List<TileData>(boardManager.triumphDeck)) },
+        { TileZone.Finish, ShuffleList(new List<TileData>(boardManager.finishDeck)) }
+    };
 
         var zoneIndices = new Dictionary<TileZone, int>()
-        {
-            { TileZone.Start, 0 },
-            { TileZone.Progress, 0 },
-            { TileZone.Triumph, 0 },
-            { TileZone.Finish, 0 }
-        };
+    {
+        { TileZone.Start, 0 },
+        { TileZone.Progress, 0 },
+        { TileZone.Triumph, 0 },
+        { TileZone.Finish, 0 }
+    };
 
         for (int i = 0; i < path.Count; i++)
         {
             Vector2Int gridPos = path[i];
+
+            Vector3 pos = new Vector3(
+                gridPos.x * tileSize,
+                gridPos.y * tileSize,
+                0
+            ) - offset;
+
             TileZone zone = GetZone(i);
 
-            GameObject tileGO = Instantiate(tilePrefab, new Vector3(gridPos.x * tileSize, gridPos.y * tileSize, 0), Quaternion.identity, transform);
+            GameObject prefabToUse = zone == TileZone.Corner
+                ? boardManager.cornerTilePrefab
+                : boardManager.defaultTilePrefab;
+
+            GameObject tileGO = Instantiate(prefabToUse, pos, Quaternion.identity, transform);
+
+            tileGO.transform.localScale = Vector3.one * tileSize;
+
             TileInstance instance = tileGO.GetComponent<TileInstance>();
 
             if (zone == TileZone.Corner)
             {
-                instance.Initialize(boardManager.cornerTile);
             }
             else
             {
@@ -86,6 +119,30 @@ public class BoardGenerator : MonoBehaviour
                 zoneIndices[zone]++;
             }
         }
+    }
+
+    Vector3 GetBoardOffset()
+    {
+        float boardWorldSize = (boardManager.boardSize - 1) * tileSize;
+        return new Vector3(boardWorldSize / 2f, boardWorldSize / 2f, 0);
+    }
+
+    void FitBoardToCamera()
+    {
+        Camera cam = Camera.main;
+
+        float screenHeight = cam.orthographicSize * 2f;
+        float screenWidth = screenHeight * cam.aspect;
+
+        float usableWidth = screenWidth * boardPadding;
+        float usableHeight = screenHeight * boardPadding;
+
+        float boardSize = boardManager.boardSize;
+
+        float sizeByWidth = usableWidth / boardSize;
+        float sizeByHeight = usableHeight / boardSize;
+
+        tileSize = Mathf.Min(sizeByWidth, sizeByHeight);
     }
 
     List<TileData> ShuffleList(List<TileData> list)

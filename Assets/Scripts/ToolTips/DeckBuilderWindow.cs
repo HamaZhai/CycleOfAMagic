@@ -65,11 +65,7 @@ public class DeckBuilderWindow : EditorWindow
             boardManager.finishDeck.Add(new TileData($"Finish_{i}", TileZone.Finish));
         }
 
-        // Corner плитка, если нужно, назначаем отдельно
-        if (boardManager.cornerTile == null)
-        {
-            boardManager.cornerTile = new TileData("Corner", TileZone.Corner);
-        }
+      
 
         Debug.Log("Decks generated successfully!");
     }
