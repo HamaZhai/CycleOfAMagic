@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+
 
 public enum TileZone
 {
@@ -9,22 +11,38 @@ public enum TileZone
     Finish
 }
 
-[RequireComponent(typeof(SpriteRenderer))]
+[RequireComponent(typeof(SpriteRenderer), typeof(Collider2D))]
 public class TileInstance : MonoBehaviour
 {
     public TileData data;
+    private GameController game;
+    public bool isStartCorner = false;
 
-    // Инициализация плитки из колоды
+    public void InitController(GameController controller)
+    {
+        game = controller;
+    }
+
     public void Initialize(TileData tileData)
     {
-        // Копируем данные, чтобы доска имела уникальные экземпляры
         data = new TileData(tileData.tileName, tileData.zone);
         data.effect = tileData.effect;
         gameObject.name = $"Tile_{data.tileName}";
     }
 
-    public void SetEffect(string effect)
+    public void HandleClick()
     {
-        data.effect = effect;
+        if (isStartCorner)
+        {
+            Debug.Log("START TILE CLICKED");
+
+            if (game == null)
+            {
+                Debug.LogError("GameController NULL");
+                return;
+            }
+
+            game.OnStartTileClicked();
+        }
     }
 }

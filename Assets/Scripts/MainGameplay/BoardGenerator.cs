@@ -6,6 +6,7 @@ public class BoardGenerator : MonoBehaviour
     public float tileSize = 1f;
     public BoardManager boardManager;
     public GameObject tilePrefab; // визуальный префаб плитки
+    public GameController gameController;
     public List<Vector2Int> Path => path; // публично путь для фигур
     private List<TileInstance> spawnedTiles = new List<TileInstance>();
 
@@ -108,8 +109,20 @@ public class BoardGenerator : MonoBehaviour
 
             TileInstance instance = tileGO.GetComponent<TileInstance>();
 
+
             if (zone == TileZone.Corner)
             {
+                TileData cornerData = new TileData($"Corner_{i}", TileZone.Corner);
+
+                if (i == 0)
+                {
+                    instance.isStartCorner = true;
+                    instance.GetComponent<SpriteRenderer>().color = Color.green;
+
+                    cornerData.effect = "Start"; // маркер, если пригодится
+                }
+
+                instance.Initialize(cornerData);
             }
             else
             {
@@ -118,6 +131,8 @@ public class BoardGenerator : MonoBehaviour
                 instance.Initialize(deck[idx]);
                 zoneIndices[zone]++;
             }
+
+            instance.InitController(gameController);
         }
     }
 
