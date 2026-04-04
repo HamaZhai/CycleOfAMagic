@@ -14,6 +14,7 @@ public class GameController : MonoBehaviour
 
     void Start()
     {
+        board.Init();
         dice.OnDiceRolled += OnDiceRolled;
     }
 
@@ -36,12 +37,14 @@ public class GameController : MonoBehaviour
 
     void SpawnPiece()
     {
-        GameObject obj = Instantiate(piecePrefab);
+        Vector3 startpos = board.GetWorldPosition(0);
+
+        GameObject obj = Instantiate(piecePrefab, startpos, Quaternion.identity);
+
         Piece piece = obj.GetComponent<Piece>();
 
         piece.Init(board, this);
-        piece.SpawnAtStart();
-
+        piece.currentIndex = 0;
         pieces.Add(piece);
     }
 
@@ -53,10 +56,5 @@ public class GameController : MonoBehaviour
 
         piece.Move(lastDiceValue);
         waitingForInput = false;
-    }
-
-    public void OnPieceFinishedMove()
-    {
-        lastDiceValue = 0;
     }
 }

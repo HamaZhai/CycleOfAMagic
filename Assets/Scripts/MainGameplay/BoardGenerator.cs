@@ -35,12 +35,17 @@ public class BoardGenerator : MonoBehaviour
             return;
         }
 
-        FitBoardToCamera();
-
-        GeneratePath(boardManager.boardSize);
-        SpawnBoard();
     }
 
+
+    public void Init()
+    {
+
+        FitBoardToCamera();
+        GeneratePath(boardManager.boardSize);
+        SpawnBoard();
+
+    }
     void GeneratePath(int boardSize)
     {
         int max = boardSize - 1;
@@ -133,6 +138,7 @@ public class BoardGenerator : MonoBehaviour
             }
 
             instance.InitController(gameController);
+            spawnedTiles.Add(instance);
         }
     }
 
@@ -170,5 +176,37 @@ public class BoardGenerator : MonoBehaviour
             list[rnd] = temp;
         }
         return list;
+    }
+
+    void OnDrawGizmos()
+    {
+        if (path == null || path.Count == 0) return;
+
+        Vector3 offset = Application.isPlaying ? GetBoardOffset() : Vector3.zero;
+
+        for (int i = 0; i < path.Count; i++)
+        {
+            float t = (float)i / path.Count;
+            Gizmos.color = Color.Lerp(Color.green, Color.red, t);
+
+            Vector3 pos = new Vector3(
+                path[i].x * tileSize,
+                path[i].y * tileSize,
+                0
+            ) - offset;
+
+            Gizmos.DrawSphere(pos, 0.12f);
+
+            if (i < path.Count - 1)
+            {
+                Vector3 nextPos = new Vector3(
+                    path[i + 1].x * tileSize,
+                    path[i + 1].y * tileSize,
+                    0
+                ) - offset;
+
+                Gizmos.DrawLine(pos, nextPos);
+            }
+        }
     }
 }

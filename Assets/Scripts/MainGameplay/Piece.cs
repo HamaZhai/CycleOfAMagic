@@ -14,12 +14,6 @@ public class Piece : MonoBehaviour
         game = controller;
     }
 
-    public void SpawnAtStart()
-    {
-        currentIndex = 0;
-        transform.position = board.GetWorldPosition(currentIndex);
-    }
-
     public void HandleClick()
     {
         game.OnPieceClicked(this);
@@ -54,6 +48,5 @@ public class Piece : MonoBehaviour
             currentIndex = nextIndex;
         }
 
-        game.OnPieceFinishedMove();
     }
 }
