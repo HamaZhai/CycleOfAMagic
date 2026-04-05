@@ -9,15 +9,20 @@ public class InputHandler : MonoBehaviour
 
     private InputAction clickAction;
 
+    private bool clickRequested = false;
+
     private void Awake()
     {
         clickAction = new InputAction(binding: "<Mouse>/leftButton");
-        clickAction.performed += OnClick;
+        clickAction.performed += ctx => clickRequested = true;
         clickAction.Enable();
     }
 
-    private void OnClick(InputAction.CallbackContext context)
+    private void Update()
     {
+        if (!clickRequested) return;
+        clickRequested = false;
+
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 

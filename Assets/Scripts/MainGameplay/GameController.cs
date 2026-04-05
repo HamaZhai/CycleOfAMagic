@@ -42,9 +42,12 @@ public class GameController : MonoBehaviour
         GameObject obj = Instantiate(piecePrefab, startpos, Quaternion.identity);
 
         Piece piece = obj.GetComponent<Piece>();
-
+        
+        
         piece.Init(board, this);
         piece.currentIndex = 0;
+        piece.isInPlay = true;
+
         pieces.Add(piece);
     }
 
@@ -54,7 +57,18 @@ public class GameController : MonoBehaviour
         if (!waitingForInput) return;
         if (lastDiceValue == 0) return;
 
-        piece.Move(lastDiceValue);
+        if (piece.isInPlay)
+            return;
+
+        if (piece.canEnterCenter)
+        {
+            piece.EnterCenter(lastDiceValue);
+        }
+        else
+        {
+            piece.Move(lastDiceValue);
+        }
+
         waitingForInput = false;
     }
 }

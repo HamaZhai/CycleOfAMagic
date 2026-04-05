@@ -8,13 +8,18 @@ public class BoardGenerator : MonoBehaviour
     public GameObject tilePrefab; // визуальный префаб плитки
     public GameController gameController;
     public List<Vector2Int> Path => path; // публично путь дл€ фигур
-    private List<TileInstance> spawnedTiles = new List<TileInstance>();
+    private List<Vector2Int> path = new List<Vector2Int>();
+    public List<Vector2Int> CenterPath => centerPath;
+    private List<Vector2Int> centerPath = new List<Vector2Int>();
 
+    private List<TileInstance> spawnedTiles = new List<TileInstance>();
+    private List<TileInstance> spawnedCenterTiles = new List<TileInstance>();
     public Vector3 GetWorldPosition(int index)
     {
         if (index < 0 || index >= spawnedTiles.Count) return Vector3.zero;
         return spawnedTiles[index].transform.position;
     }
+
 
     public TileInstance GetTileInstance(int index)
     {
@@ -25,7 +30,7 @@ public class BoardGenerator : MonoBehaviour
     [Range(0.5f, 1f)]
     public float boardPadding = 0.9f;
 
-    private List<Vector2Int> path = new List<Vector2Int>();
+    
 
     void Start()
     {
@@ -34,15 +39,14 @@ public class BoardGenerator : MonoBehaviour
             Debug.LogError("BoardManager не назначен!");
             return;
         }
-
     }
-
 
     public void Init()
     {
 
         FitBoardToCamera();
         GeneratePath(boardManager.boardSize);
+        GenerateCenterPath(boardManager.boardSize);
         SpawnBoard();
 
     }
@@ -54,6 +58,16 @@ public class BoardGenerator : MonoBehaviour
         for (int y = 1; y <= max; y++) path.Add(new Vector2Int(max, y));
         for (int x = max - 1; x >= 0; x--) path.Add(new Vector2Int(x, max));
         for (int y = max - 1; y > 0; y--) path.Add(new Vector2Int(0, y));
+    }
+
+    void GenerateCenterPath(int boardSize)
+    {
+        int center = (boardSize - 1) / 2;
+
+        for (int i = 0; i <= center; i++)
+        {
+            centerPath.Add(new Vector2Int(i, i));
+        }
     }
 
     TileZone GetZone(int index)
@@ -92,6 +106,22 @@ public class BoardGenerator : MonoBehaviour
         { TileZone.Finish, 0 }
     };
 
+     
+         foreach (var gridpos in centerPath)
+        {
+            Vector3 pos = new Vector3(gridpos.x * tileSize, gridpos.y * tileSize, 0) - GetBoardOffset();
+
+            GameObject tileGO = Instantiate(boardManager.defaultTilePrefab, pos, Quaternion.identity, transform);
+
+            tileGO.transform.localScale = Vector3.one * tileSize;
+
+            TileInstance instance = tileGO.GetComponent<TileInstance>();
+
+            TileData tileData = new TileData("Center", TileZone.Finish);
+            instance.Initialize(tileData);
+            spawnedCenterTiles.Add(instance);
+        }
+
         for (int i = 0; i < path.Count; i++)
         {
             Vector2Int gridPos = path[i];
@@ -123,8 +153,6 @@ public class BoardGenerator : MonoBehaviour
                 {
                     instance.isStartCorner = true;
                     instance.GetComponent<SpriteRenderer>().color = Color.green;
-
-                    cornerData.effect = "Start"; // маркер, если пригодитс€
                 }
 
                 instance.Initialize(cornerData);
@@ -137,9 +165,12 @@ public class BoardGenerator : MonoBehaviour
                 zoneIndices[zone]++;
             }
 
-            instance.InitController(gameController);
+            instance.Init(gameController);
             spawnedTiles.Add(instance);
+            
         }
+
+       
     }
 
     Vector3 GetBoardOffset()
@@ -207,6 +238,20 @@ public class BoardGenerator : MonoBehaviour
 
                 Gizmos.DrawLine(pos, nextPos);
             }
+        }
+
+        // Center path Ч синий
+        Gizmos.color = Color.cyan;
+
+        foreach (var p in centerPath)
+        {
+            Vector3 pos = new Vector3(
+                p.x * tileSize,
+                p.y * tileSize,
+                0
+            ) - offset;
+
+            Gizmos.DrawCube(pos, Vector3.one * 0.2f);
         }
     }
 }

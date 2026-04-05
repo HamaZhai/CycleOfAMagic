@@ -16,10 +16,12 @@ public class TileInstance : MonoBehaviour
 {
     public TileData data;
     private GameController game;
-    public bool isStartCorner = false;
 
-    public void InitController(GameController controller)
-    {
+    public bool isStartCorner;
+
+
+    public void Init(GameController controller) 
+    { 
         game = controller;
     }
 
@@ -34,14 +36,6 @@ public class TileInstance : MonoBehaviour
     {
         if (isStartCorner)
         {
-            Debug.Log("START TILE CLICKED");
-
-            if (game == null)
-            {
-                Debug.LogError("GameController NULL");
-                return;
-            }
-
             game.OnStartTileClicked();
         }
     }
