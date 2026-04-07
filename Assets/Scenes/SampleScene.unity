@@ -632,8 +632,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BoardGenerator
   tileSize: 0.5
-  boardManager: {fileID: 11400000, guid: 4fa6a965b0594144cadfed44f86ded56, type: 2}
-  tilePrefab: {fileID: 7741288560753764945, guid: a7a9b14a5d364c94da741f40e9b9de04, type: 3}
+  startIndex: 0
+  boardManager: {fileID: 11400000, guid: 09a8068a88ba3bf4ab9ced3a14115a1d, type: 2}
   gameController: {fileID: 1080128564}
   boardPadding: 0.9
 --- !u!4 &1782639502
@@ -804,7 +804,7 @@ MonoBehaviour:
   - {fileID: -1672161, guid: c3cb86097665d584bb2188a30c6275ba, type: 3}
   - {fileID: 1780910445, guid: c3cb86097665d584bb2188a30c6275ba, type: 3}
   - {fileID: 527383274, guid: c3cb86097665d584bb2188a30c6275ba, type: 3}
-  rollDuration: 1
+  rollDuration: 0.5
   rollSpeed: 0.05
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

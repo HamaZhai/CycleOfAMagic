@@ -30,6 +30,7 @@ public class GameController : MonoBehaviour
         if (!waitingForInput) return;
         if (lastDiceValue != 6) return;
 
+
         SpawnPiece();
 
         waitingForInput = false;
@@ -37,7 +38,7 @@ public class GameController : MonoBehaviour
 
     void SpawnPiece()
     {
-        Vector3 startpos = board.GetWorldPosition(0);
+        Vector3 startpos = board.GridToWorld(board.PerimeterPath[0]);
 
         GameObject obj = Instantiate(piecePrefab, startpos, Quaternion.identity);
 
@@ -45,7 +46,7 @@ public class GameController : MonoBehaviour
         
         
         piece.Init(board, this);
-        piece.currentIndex = 0;
+        piece.perimeterIndex = 0;
         piece.isInPlay = true;
 
         pieces.Add(piece);
@@ -57,18 +58,12 @@ public class GameController : MonoBehaviour
         if (!waitingForInput) return;
         if (lastDiceValue == 0) return;
 
-        if (piece.isInPlay)
+        if (!piece.isInPlay)
             return;
 
-        if (piece.canEnterCenter)
-        {
-            piece.EnterCenter(lastDiceValue);
-        }
-        else
-        {
-            piece.Move(lastDiceValue);
-        }
+        piece.Move(lastDiceValue);
 
         waitingForInput = false;
+        lastDiceValue = 0;
     }
 }

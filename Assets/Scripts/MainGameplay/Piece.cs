@@ -1,6 +1,4 @@
-using JetBrains.Annotations;
 using System.Collections;
-using System.Resources;
 using UnityEngine;
 
 public enum PieceState
@@ -14,14 +12,16 @@ public class Piece : MonoBehaviour
 {
     public PieceState state = PieceState.OnPerimeter;
 
-    private BoardGenerator board;
-    private GameController game;
-
-    public int currentIndex = -1;
-    public int lapCount = 0;
-    public int centerIndex = 0;
+    public bool completedLoop = false;
     public bool isInPlay = false;
 
+    public int perimeterIndex = 0;
+    private int centerIndex = -1;
+
+    private bool hasLeftStart = false;
+
+    private BoardGenerator board;
+    private GameController game;
 
     public void Init(BoardGenerator boardGenerator, GameController controller)
     {
@@ -39,70 +39,60 @@ public class Piece : MonoBehaviour
         StartCoroutine(MoveRoutine(steps));
     }
 
-    public void EnterCenter(int steps)
-    {
-        if(lapCount < 1 && currentIndex != 0)
-            return;
-
-        state = PieceState.InCenter;
-        centerIndex = 0;
-
-        StartCoroutine(MoveInCenter(steps));
-    }
-
     IEnumerator MoveRoutine(int steps)
     {
-        for (int i = 0; i < steps; i++)
+        while (steps > 0)
         {
-            int nextIndex = currentIndex + 1;
-
-            if (nextIndex >= board.Path.Count)
+            // -------- PERIMETER --------
+            if (state == PieceState.OnPerimeter)
             {
-                nextIndex = 0;
-                lapCount++;
+                int nextIndex = (perimeterIndex + 1) % board.PerimeterPath.Count;
+
+                yield return MoveTo(board.PerimeterPath[nextIndex]);
+
+                perimeterIndex = nextIndex;
+
+                if (perimeterIndex != board.startIndex)
+                    hasLeftStart = true;
+
+                if (perimeterIndex == board.startIndex && hasLeftStart)
+                {
+                    completedLoop = true;
+                    state = PieceState.InCenter;
+                    centerIndex = -1;
+                }
+            }
+            // -------- CENTER --------
+            else if (state == PieceState.InCenter)
+            {
+                int nextIndex = centerIndex + 1;
+
+                if (nextIndex >= board.CenterPath.Count)
+                {
+                    state = PieceState.Finished;
+                    yield break;
+                }
+
+                yield return MoveTo(board.CenterPath[nextIndex]);
+                centerIndex = nextIndex;
             }
 
-
-            Vector3 target = board.GetWorldPosition(nextIndex);
-
-            while (Vector3.Distance(transform.position, target) > 0.01f)
-            {
-                transform.position = Vector3.MoveTowards(
-                    transform.position,
-                    target,
-                    6f * Time.deltaTime
-                );
-                yield return null;
-            }
-
-            currentIndex = nextIndex;
+            steps--;
         }
-
     }
 
-    public bool canEnterCenter => lapCount >= 1 && currentIndex == 0;
-
-    IEnumerator MoveInCenter(int steps)
+    IEnumerator MoveTo(Vector2Int gridPos)
     {
-        for (int i = 0; i < steps; i++)
+        Vector3 target = board.GridToWorld(gridPos);
+
+        while (Vector3.Distance(transform.position, target) > 0.01f)
         {
-            int nextindex = centerIndex + 1;
-
-            if (nextindex >= board.CenterPath.Count)
-            {
-                state = PieceState.Finished;
-                yield break;
-            }
-
-            Vector3 target = new Vector3(board.CenterPath[nextindex].x * board.tileSize, board.CenterPath[nextindex].y * board.tileSize,0) - board.transform.position;
-
-            while (Vector3.Distance(transform.position , target) > 0.01f) 
-            {
-                transform.position = Vector3.MoveTowards(transform.position, target, 6f * Time.deltaTime);
-                yield return null;
-            }
-
-            centerIndex = nextindex;
+            transform.position = Vector3.MoveTowards(
+                transform.position,
+                target,
+                6f * Time.deltaTime
+            );
+            yield return null;
         }
     }
 }
