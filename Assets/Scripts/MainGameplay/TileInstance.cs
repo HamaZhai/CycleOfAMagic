@@ -18,6 +18,33 @@ public class TileInstance : MonoBehaviour
     private GameController game;
 
     public bool isStartCorner;
+    public Piece OccupiedPiece { get; private set; }
+
+    [SerializeField] private SpriteRenderer sr;
+    private Color basecolor;
+
+    private void Awake()
+    {
+        sr = GetComponent<SpriteRenderer>();
+        basecolor = sr.color;
+    }
+
+    public bool IsOccupied()
+    {
+        return OccupiedPiece != null;
+    }
+
+    public void SetPiece(Piece piece)
+    {
+        OccupiedPiece = piece;
+        sr.color = Color.magenta;
+    }
+
+    public void ClearPiece()
+    {
+        OccupiedPiece = null;
+        sr.color = basecolor;
+    }
 
     public void Init(GameController controller)
     {

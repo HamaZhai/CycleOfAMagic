@@ -16,9 +16,9 @@ public class Piece : MonoBehaviour
     public bool isInPlay = false;
 
     public int perimeterIndex = 0;
-    private int centerIndex = -1;
+    public int centerIndex = -1;
 
-    private bool hasLeftStart = false;
+    public bool hasLeftStart = false;
 
     private BoardGenerator board;
     private GameController game;
@@ -41,6 +41,8 @@ public class Piece : MonoBehaviour
 
     IEnumerator MoveRoutine(int steps)
     {
+       
+
         while (steps > 0)
         {
             // -------- PERIMETER --------
@@ -48,18 +50,33 @@ public class Piece : MonoBehaviour
             {
                 int nextIndex = (perimeterIndex + 1) % board.PerimeterPath.Count;
 
+                TileInstance currentTile = board.GetTile(board.PerimeterPath[perimeterIndex]);
+                TileInstance nextTile = board.GetTile(board.PerimeterPath[nextIndex]);
+
+                currentTile.ClearPiece();
+
                 yield return MoveTo(board.PerimeterPath[nextIndex]);
+                
+                nextTile.SetPiece(this);
 
                 perimeterIndex = nextIndex;
 
                 if (perimeterIndex != board.startIndex)
                     hasLeftStart = true;
 
-                if (perimeterIndex == board.startIndex && hasLeftStart)
+                if (nextIndex == board.startIndex && hasLeftStart)
                 {
                     completedLoop = true;
+
+                    TileInstance oldTile = board.GetTile(board.PerimeterPath[perimeterIndex]);
+                    oldTile.ClearPiece();
+
                     state = PieceState.InCenter;
                     centerIndex = -1;
+
+                    perimeterIndex = nextIndex;
+
+                    continue;
                 }
             }
             // -------- CENTER --------
@@ -74,6 +91,16 @@ public class Piece : MonoBehaviour
                 }
 
                 yield return MoveTo(board.CenterPath[nextIndex]);
+
+                if (centerIndex >= 0)
+                {
+                    var currentTile = board.GetTile(board.CenterPath[centerIndex]);
+                    currentTile.ClearPiece();
+                }
+
+                var nextTile = board.GetTile(board.CenterPath[nextIndex]);
+                nextTile.SetPiece(this);
+
                 centerIndex = nextIndex;
             }
 

@@ -1,3 +1,4 @@
+using JetBrains.Annotations;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,6 +17,8 @@ public class BoardGenerator : MonoBehaviour
     private List<Vector2Int> centerPath = new List<Vector2Int>();
 
     private List<TileInstance> spawnedTiles = new List<TileInstance>();
+
+    private Dictionary<Vector2Int, TileInstance> tilemap = new();
 
     [Range(0.5f, 1f)]
     public float boardPadding = 0.9f;
@@ -114,6 +117,7 @@ public class BoardGenerator : MonoBehaviour
 
             instance.Init(gameController);
             spawnedTiles.Add(instance);
+            tilemap[pos] = instance;
         }
 
         // --- CENTER ---
@@ -139,7 +143,14 @@ public class BoardGenerator : MonoBehaviour
 
             instance.Init(gameController);
             spawnedTiles.Add(instance);
+            tilemap[pos] = instance;
+
         }
+    }
+
+    public TileInstance GetTile(Vector2Int pos)
+    {
+        return tilemap[pos];
     }
 
     // ---------------- ZONES ----------------
