@@ -36,6 +36,11 @@ public class TileInstance : MonoBehaviour
 
     public void SetPiece(Piece piece)
     {
+        if (OccupiedPiece != null)
+        {
+            Debug.LogError("OccupiedPiece logic not work");
+        }
+
         OccupiedPiece = piece;
         sr.color = Color.magenta;
     }

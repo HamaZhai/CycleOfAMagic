@@ -1,32 +1,27 @@
 using System.Collections;
+using Unity.VisualScripting;
 using UnityEngine;
-
-public enum PieceState
-{
-    OnPerimeter,
-    InCenter,
-    Finished
-}
+using UnityEngine.InputSystem.LowLevel;
 
 public class Piece : MonoBehaviour
 {
-    public PieceState state = PieceState.OnPerimeter;
-
-    public bool completedLoop = false;
-    public bool isInPlay = false;
-
-    public int perimeterIndex = 0;
+    public int perimeterIndex;
     public int centerIndex = -1;
-
-    public bool hasLeftStart = false;
+    public bool hasLeftStart;
 
     private BoardGenerator board;
     private GameController game;
 
-    public void Init(BoardGenerator boardGenerator, GameController controller)
+    public void Init(BoardGenerator b, GameController g)
     {
-        board = boardGenerator;
-        game = controller;
+        board = b;
+        game = g;
+    }
+
+    public void PlaceAtStart(int index)
+    {
+        perimeterIndex = index;
+        hasLeftStart = false;
     }
 
     public void HandleClick()
@@ -41,84 +36,82 @@ public class Piece : MonoBehaviour
 
     IEnumerator MoveRoutine(int steps)
     {
-       
-
-        while (steps > 0)
+        while (steps-- > 0)
         {
-            // -------- PERIMETER --------
-            if (state == PieceState.OnPerimeter)
+            // -------- CENTER MOVEMENT --------
+            if (centerIndex >= 0)
             {
-                int nextIndex = (perimeterIndex + 1) % board.PerimeterPath.Count;
+                int next = centerIndex + 1;
 
-                TileInstance currentTile = board.GetTile(board.PerimeterPath[perimeterIndex]);
-                TileInstance nextTile = board.GetTile(board.PerimeterPath[nextIndex]);
-
-                currentTile.ClearPiece();
-
-                yield return MoveTo(board.PerimeterPath[nextIndex]);
-                
-                nextTile.SetPiece(this);
-
-                perimeterIndex = nextIndex;
-
-                if (perimeterIndex != board.startIndex)
-                    hasLeftStart = true;
-
-                if (nextIndex == board.startIndex && hasLeftStart)
+                if (next >= board.CenterPath.Count)
                 {
-                    completedLoop = true;
-
-                    TileInstance oldTile = board.GetTile(board.PerimeterPath[perimeterIndex]);
-                    oldTile.ClearPiece();
-
-                    state = PieceState.InCenter;
-                    centerIndex = -1;
-
-                    perimeterIndex = nextIndex;
-
-                    continue;
-                }
-            }
-            // -------- CENTER --------
-            else if (state == PieceState.InCenter)
-            {
-                int nextIndex = centerIndex + 1;
-
-                if (nextIndex >= board.CenterPath.Count)
-                {
-                    state = PieceState.Finished;
+                    board.GetTile(board.CenterPath[centerIndex]).ClearPiece();
+                    game.NotifyMoveFinished();
                     yield break;
                 }
 
-                yield return MoveTo(board.CenterPath[nextIndex]);
+                var currentTile = board.GetTile(board.CenterPath[centerIndex]);
+                var nextTile = board.GetTile(board.CenterPath[next]);
 
-                if (centerIndex >= 0)
-                {
-                    var currentTile = board.GetTile(board.CenterPath[centerIndex]);
-                    currentTile.ClearPiece();
-                }
+                currentTile.ClearPiece();
 
-                var nextTile = board.GetTile(board.CenterPath[nextIndex]);
+                yield return MoveTo(board.CenterPath[next]);
+
                 nextTile.SetPiece(this);
 
-                centerIndex = nextIndex;
+                centerIndex = next;
+
+                continue;
             }
 
-            steps--;
+            // -------- PERIMETER MOVEMENT --------
+            int nextIndex = (perimeterIndex + 1) % board.PerimeterPath.Count;
+
+            var current = board.GetTile(board.PerimeterPath[perimeterIndex]);
+            var nextTileP = board.GetTile(board.PerimeterPath[nextIndex]);
+
+            current.ClearPiece();
+
+            yield return MoveTo(board.PerimeterPath[nextIndex]);
+
+            perimeterIndex = nextIndex;
+
+            if (nextIndex == board.startIndex && hasLeftStart)
+            {
+                hasLeftStart = true;
+
+                current.ClearPiece();
+
+                centerIndex = 0;
+
+                var centerTile = board.GetTile(board.CenterPath[0]);
+
+                if (centerTile.IsOccupied())
+                {
+                    Debug.LogError("Center tile already occupied — logic broken");
+                }
+
+                centerTile.SetPiece(this);
+
+                game.NotifyMoveFinished();
+                yield break;
+            }
+
+            hasLeftStart = true;
+
+            nextTileP.SetPiece(this);
         }
+
+        game.NotifyMoveFinished();
     }
 
-    IEnumerator MoveTo(Vector2Int gridPos)
+    IEnumerator MoveTo(Vector2Int pos)
     {
-        Vector3 target = board.GridToWorld(gridPos);
+        Vector3 target = board.GridToWorld(pos);
 
-        while (Vector3.Distance(transform.position, target) > 0.01f)
+        while ((transform.position - target).sqrMagnitude > 0.001f)
         {
-            transform.position = Vector3.MoveTowards(
-                transform.position,
-                target,
-                6f * Time.deltaTime
-            );
+            transform.position = Vector3.MoveTowards(transform.position, target, 6f * Time.deltaTime);
             yield return null;
         }
     }

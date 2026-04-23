@@ -1,158 +1,109 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
+public enum GameState
+{
+    WaitingRoll,
+    SelectOrSpawn,
+    Moving
+}
+
 public class GameController : MonoBehaviour
 {
     public DiceController dice;
     public BoardGenerator board;
     public GameObject piecePrefab;
 
-    private int lastDiceValue = 0;
-    private bool waitingForInput = false;
+    private GameState state = GameState.WaitingRoll;
+    private int diceValue;
 
-    private List<Piece> pieces = new List<Piece>();
+    private readonly List<Piece> pieces = new();
 
-    void Start()
+    private void Start()
     {
         board.Init();
         dice.OnDiceRolled += OnDiceRolled;
+        dice.CanRoll = () => state == GameState.WaitingRoll;
     }
 
-    void OnDiceRolled(int value)
+    private void OnDiceRolled(int value)
     {
-        lastDiceValue = value;
-        waitingForInput = true;
+        if (state != GameState.WaitingRoll) return;
+
+        diceValue = value;
+
+        if (!HasAnyPiecesOnBoard())
+        {
+            if (diceValue != 6)
+            {
+                diceValue = 0;
+                state = GameState.WaitingRoll;
+                return;
+            }
+
+            state = GameState.SelectOrSpawn;
+            return;
+        }
+
+        state = GameState.SelectOrSpawn;
     }
 
-    // Клик по стартовой клетке
     public void OnStartTileClicked()
     {
-        if (!waitingForInput) return;
-        if (lastDiceValue != 6) return;
-
-        Vector2Int startGrid = board.PerimeterPath[board.startIndex];
-        TileInstance startTile = board.GetTile(startGrid);
-
-        if (startTile.IsOccupied())
-        {
-            Debug.Log("Start blocked, choose another piece");
-            return; 
-        }
+        if (state != GameState.SelectOrSpawn) return;
+        if (diceValue != 6) return;
 
         SpawnPiece();
-
-        waitingForInput = false;
-        lastDiceValue = 0;
     }
 
-    public bool CanMove(Piece piece, int steps)
+    public bool HasAnyPiecesOnBoard()
     {
-        List<Vector2Int> path = BuildPath(piece, steps);
-
-        if (path.Count < steps)
-        {
-            return false;
-        }
-
-        foreach (var pos in path)
-        {
-            var tile = board.GetTile(pos);
-
-            if (tile.IsOccupied() && tile.OccupiedPiece != piece)
-                return false;
-        }
-
-        return true;
+        return pieces.Count > 0;
     }
 
-    List<Vector2Int> BuildPath (Piece piece , int steps)
+    private void SpawnPiece()
     {
-        List<Vector2Int> result = new();
+        Vector2Int start = board.PerimeterPath[board.startIndex];
+        TileInstance tile = board.GetTile(start);
 
-        int tempPerimeter = piece.perimeterIndex;
-        int tempCenter = piece.centerIndex;
-        PieceState tempState = piece.state;
-        bool tempHasLeft = piece.hasLeftStart;
+        if (tile.IsOccupied()) return;
 
-        while (steps > 0)
-        {
-            if (tempState == PieceState.OnPerimeter)
-            {
+        GameObject obj = Instantiate(piecePrefab, board.GridToWorld(start), Quaternion.identity);
 
-                int next = (tempPerimeter + 1) % board.PerimeterPath.Count;
-                result.Add(board.PerimeterPath[next]);
+        Piece p = obj.GetComponent<Piece>();
+        p.Init(board, this);
 
-                if (next != board.startIndex)
-                {
-                    tempHasLeft = true;
-                }
+        p.PlaceAtStart(board.startIndex);
 
-                if (next == board.startIndex && tempHasLeft)
-                {
+        tile.SetPiece(p);
+        pieces.Add(p);
 
-                    tempState = PieceState.InCenter;
-                    tempCenter = -1;
-                }
-
-                tempPerimeter = next;
-            }
-            else if (tempState == PieceState.InCenter)
-            {
-                int next = tempCenter + 1;
-
-                if (next >= board.CenterPath.Count)
-                    break;
-
-                result.Add(board.CenterPath[next]);
-                tempCenter = next;
-            }
-
-            steps --;
-        }
-
-        return result;
-    }
-    
-    void SpawnPiece()
-    {
-        Vector2Int startGrid = board.PerimeterPath[board.startIndex];
-        TileInstance startTile = board.GetTile(startGrid);
-
-        if (startTile.IsOccupied())
-        {
-            Debug.Log("Start tile occupied");
-            return;
-        }
-        
-        GameObject obj = Instantiate(piecePrefab, board.GridToWorld(startGrid), Quaternion.identity);
-
-        Piece piece = obj.GetComponent<Piece>();
-        piece.Init(board, this);
-        
-        
-        piece.perimeterIndex = 0;
-        piece.isInPlay = true;
-
-        startTile.SetPiece(piece);
-
-        pieces.Add(piece);
+        EndTurn();
     }
 
-    // Клик по фигуре
     public void OnPieceClicked(Piece piece)
     {
-        if (!waitingForInput) return;
-        if (lastDiceValue == 0) return;
+        if (state != GameState.SelectOrSpawn) return ;
+        if (diceValue == 0) return;
 
-        if (!CanMove (piece, lastDiceValue))
-        {
-            Debug.Log("Move blocked");
-            return;
-        }
+        if (!board.CanMove(piece, diceValue)) return;
 
-        piece.Move(lastDiceValue);
+        state = GameState.Moving;
 
-        waitingForInput = false;
-        lastDiceValue = 0;
+        int move = diceValue;
+        diceValue = 0;
+
+        piece.Move(move);
+    }
+
+    public void NotifyMoveFinished()
+    {
+        EndTurn();
+    }
+
+    private void EndTurn()
+    {
+        diceValue = 0;
+        state = GameState.WaitingRoll; 
     }
 }

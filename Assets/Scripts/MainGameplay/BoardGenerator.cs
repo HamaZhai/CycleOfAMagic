@@ -1,5 +1,6 @@
 using JetBrains.Annotations;
 using System.Collections.Generic;
+using UnityEditor.Build;
 using UnityEngine;
 
 public class BoardGenerator : MonoBehaviour
@@ -151,6 +152,25 @@ public class BoardGenerator : MonoBehaviour
     public TileInstance GetTile(Vector2Int pos)
     {
         return tilemap[pos];
+    }
+
+    public bool CanMove(Piece piece, int steps)
+    {
+        int index = piece.perimeterIndex;
+
+        for (int i = 0; i < steps; i++)
+        {
+            index = (index + 1) % PerimeterPath.Count;
+
+            var tile = GetTile(PerimeterPath[index]);
+
+            if (tile.IsOccupied() && tile.OccupiedPiece != piece)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     // ---------------- ZONES ----------------

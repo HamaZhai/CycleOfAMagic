@@ -14,10 +14,13 @@ public class DiceController : MonoBehaviour
     private int currentValue;
 
     public System.Action<int> OnDiceRolled;
+    public System.Func<bool> CanRoll;
 
     public void OnDiceClicked()
     {
         if (isRolling) return;
+        if (CanRoll != null && !CanRoll()) return;
+
         StartCoroutine(RollDice());
     }
 
@@ -27,6 +30,7 @@ public class DiceController : MonoBehaviour
 
         // 1. ‘» —»–”≈ћ результат заранее
         currentValue = Random.Range(1, 7);
+
 
         float t = 0f;
 

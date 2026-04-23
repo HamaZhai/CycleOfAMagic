@@ -12,7 +12,7 @@ public class InputHandler : MonoBehaviour
     private bool clickRequested = false;
 
     private void Awake()
-    {
+    {   
         clickAction = new InputAction(binding: "<Mouse>/leftButton");
         clickAction.performed += ctx => clickRequested = true;
         clickAction.Enable();
