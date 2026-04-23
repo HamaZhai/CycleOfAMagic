@@ -8,9 +8,12 @@ public class Piece : MonoBehaviour
     public int perimeterIndex;
     public int centerIndex = -1;
     public bool hasLeftStart;
+    public bool isFinished;
 
     private BoardGenerator board;
     private GameController game;
+
+    public bool canEnterCenter = false;
 
     public void Init(BoardGenerator b, GameController g)
     {
@@ -45,7 +48,7 @@ public class Piece : MonoBehaviour
 
                 if (next >= board.CenterPath.Count)
                 {
-                    board.GetTile(board.CenterPath[centerIndex]).ClearPiece();
+                    isFinished = true;
                     game.NotifyMoveFinished();
                     yield break;
                 }
@@ -64,6 +67,27 @@ public class Piece : MonoBehaviour
                 continue;
             }
 
+            if (canEnterCenter)
+            {
+                var centerTile = board.GetTile(board.CenterPath[0]);
+
+                if (!centerTile.IsOccupied())
+                {
+                    var currentTile = board.GetTile(board.PerimeterPath[perimeterIndex]);
+                    currentTile.ClearPiece();
+
+                    yield return MoveTo(board.CenterPath[0]);
+
+                    centerTile.SetPiece(this);
+
+                    centerIndex = 0;
+                    canEnterCenter = false;
+
+                    continue;
+                }
+
+            }
+
             // -------- PERIMETER MOVEMENT --------
             int nextIndex = (perimeterIndex + 1) % board.PerimeterPath.Count;
 
@@ -78,23 +102,7 @@ public class Piece : MonoBehaviour
 
             if (nextIndex == board.startIndex && hasLeftStart)
             {
-                hasLeftStart = true;
-
-                current.ClearPiece();
-
-                centerIndex = 0;
-
-                var centerTile = board.GetTile(board.CenterPath[0]);
-
-                if (centerTile.IsOccupied())
-                {
-                    Debug.LogError("Center tile already occupied — logic broken");
-                }
-
-                centerTile.SetPiece(this);
-
-                game.NotifyMoveFinished();
-                yield break;
+                canEnterCenter = true;
             }
 
             hasLeftStart = true;
@@ -114,5 +122,7 @@ public class Piece : MonoBehaviour
             transform.position = Vector3.MoveTowards(transform.position, target, 6f * Time.deltaTime);
             yield return null;
         }
+
+        transform.position = target;
     }
 }

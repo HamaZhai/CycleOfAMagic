@@ -156,18 +156,65 @@ public class BoardGenerator : MonoBehaviour
 
     public bool CanMove(Piece piece, int steps)
     {
-        int index = piece.perimeterIndex;
+        if(piece.isFinished)
+            return false;
 
-        for (int i = 0; i < steps; i++)
+        int perimeterIndex = piece.perimeterIndex;
+        int centerIndex = piece.centerIndex;
+
+        bool hasLeftStart = piece.hasLeftStart;
+       
+        bool InCenter = centerIndex >= 0;
+        bool willEnterCenter = piece.canEnterCenter;
+
+
+        for (int step = 0; step < steps; step++)
         {
-            index = (index + 1) % PerimeterPath.Count;
-
-            var tile = GetTile(PerimeterPath[index]);
-
-            if (tile.IsOccupied() && tile.OccupiedPiece != piece)
+            if (InCenter)
             {
-                return false;
+                int nextCenter = centerIndex + 1;
+
+                if (nextCenter >= CenterPath.Count) 
+                    return false;
+
+                var tile = GetTile(CenterPath[nextCenter]);
+
+                if (tile.IsOccupied() && tile.OccupiedPiece != piece)
+                    return false;
+
+                centerIndex = nextCenter;
+                continue;   
             }
+
+            if (willEnterCenter)
+            {
+                var tile = GetTile(CenterPath[0]);
+
+                if (tile.IsOccupied() && tile.OccupiedPiece != piece)
+                    return false;
+
+                InCenter = true;
+                centerIndex = 0;
+                willEnterCenter = false;
+
+                continue;
+            }
+
+            int nextPerimeter = (perimeterIndex + 1)% perimeterPath.Count;
+
+            var tileP = GetTile(PerimeterPath[nextPerimeter]);
+
+            if (tileP.IsOccupied() && tileP.OccupiedPiece != piece)
+                    return false;
+            
+
+            if (nextPerimeter == startIndex && hasLeftStart)
+            {
+                willEnterCenter = true;
+            }
+
+            perimeterIndex = nextPerimeter; 
+            hasLeftStart = true;
         }
 
         return true;

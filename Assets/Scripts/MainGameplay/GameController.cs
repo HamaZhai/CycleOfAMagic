@@ -24,6 +24,12 @@ public class GameController : MonoBehaviour
         board.Init();
         dice.OnDiceRolled += OnDiceRolled;
         dice.CanRoll = () => state == GameState.WaitingRoll;
+
+        if (!HasAnyPiecesOnBoard())
+        {
+            SpawnPiece();
+            return;
+        }
     }
 
     private void OnDiceRolled(int value)
@@ -32,16 +38,9 @@ public class GameController : MonoBehaviour
 
         diceValue = value;
 
-        if (!HasAnyPiecesOnBoard())
+        if (!HasAnyValidMoves(diceValue))
         {
-            if (diceValue != 6)
-            {
-                diceValue = 0;
-                state = GameState.WaitingRoll;
-                return;
-            }
-
-            state = GameState.SelectOrSpawn;
+            state = GameState.WaitingRoll;
             return;
         }
 
@@ -59,6 +58,16 @@ public class GameController : MonoBehaviour
     public bool HasAnyPiecesOnBoard()
     {
         return pieces.Count > 0;
+    }
+
+    public bool HasAnyValidMoves(int diceValue)
+    {
+        foreach (var p in pieces)
+        {
+            if (!p.isFinished && board.CanMove(p, diceValue))
+                return true;
+        }
+        return false;
     }
 
     private void SpawnPiece()
@@ -85,7 +94,7 @@ public class GameController : MonoBehaviour
     {
         if (state != GameState.SelectOrSpawn) return ;
         if (diceValue == 0) return;
-
+        if (piece.isFinished) return;
         if (!board.CanMove(piece, diceValue)) return;
 
         state = GameState.Moving;
