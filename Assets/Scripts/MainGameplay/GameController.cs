@@ -64,7 +64,7 @@ public class GameController : MonoBehaviour
     {
         foreach (var p in pieces)
         {
-            if (!p.isFinished && board.CanMove(p, diceValue))
+            if (!p.isFinished && p.CanMove(diceValue))
                 return true;
         }
         return false;
@@ -95,7 +95,7 @@ public class GameController : MonoBehaviour
         if (state != GameState.SelectOrSpawn) return ;
         if (diceValue == 0) return;
         if (piece.isFinished) return;
-        if (!board.CanMove(piece, diceValue)) return;
+        if (!piece.CanMove(diceValue)) return;
 
         state = GameState.Moving;
 

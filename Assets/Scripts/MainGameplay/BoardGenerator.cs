@@ -139,7 +139,7 @@ public class BoardGenerator : MonoBehaviour
 
             instance.Initialize(new TileData("Center", TileZone.Finish));
 
-            // золотой центр
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
             tileGO.GetComponent<SpriteRenderer>().color = new Color(1f, 0.84f, 0f);
 
             instance.Init(gameController);
@@ -154,69 +154,62 @@ public class BoardGenerator : MonoBehaviour
         return tilemap[pos];
     }
 
-    public bool CanMove(Piece piece, int steps)
+    public bool TryStep(ref MoveState state, Piece piece, bool apply)
     {
-        if(piece.isFinished)
-            return false;
-
-        int perimeterIndex = piece.perimeterIndex;
-        int centerIndex = piece.centerIndex;
-
-        bool hasLeftStart = piece.hasLeftStart;
-       
-        bool InCenter = centerIndex >= 0;
-        bool willEnterCenter = piece.canEnterCenter;
-
-
-        for (int step = 0; step < steps; step++)
+        if(state.centerIndex >= 0)
         {
-            if (InCenter)
-            {
-                int nextCenter = centerIndex + 1;
+            int next = state.centerIndex + 1;
 
-                if (nextCenter >= CenterPath.Count) 
-                    return false;
+            if (next >= CenterPath.Count)
+            {   return false;}
 
-                var tile = GetTile(CenterPath[nextCenter]);
+            var tile = GetTile(CenterPath[next]);
 
-                if (tile.IsOccupied() && tile.OccupiedPiece != piece)
-                    return false;
+            if (tile.IsOccupied() && apply && tile.OccupiedPiece != piece)
+            {    return false;}
 
-                centerIndex = nextCenter;
-                continue;   
+            if (apply)
+            { 
+                state.centerIndex = next;
             }
 
-            if (willEnterCenter)
-            {
-                var tile = GetTile(CenterPath[0]);
-
-                if (tile.IsOccupied() && tile.OccupiedPiece != piece)
-                    return false;
-
-                InCenter = true;
-                centerIndex = 0;
-                willEnterCenter = false;
-
-                continue;
-            }
-
-            int nextPerimeter = (perimeterIndex + 1)% perimeterPath.Count;
-
-            var tileP = GetTile(PerimeterPath[nextPerimeter]);
-
-            if (tileP.IsOccupied() && tileP.OccupiedPiece != piece)
-                    return false;
-            
-
-            if (nextPerimeter == startIndex && hasLeftStart)
-            {
-                willEnterCenter = true;
-            }
-
-            perimeterIndex = nextPerimeter; 
-            hasLeftStart = true;
+            return true;        
         }
 
+        if (state.canEnterCenter)
+        {
+            var tile = GetTile(centerPath[0]);
+
+            if( tile.IsOccupied() && tile.OccupiedPiece != piece)
+            {   return false;}
+
+            if (apply)
+            {
+                state.centerIndex = 0;
+                state.canEnterCenter = false;
+            }
+
+            return true;
+        }
+
+        int nextP = (state.perimeterIndex + 1) % PerimeterPath.Count;
+
+        var tileP = GetTile(perimeterPath[nextP]);
+
+        if (tileP.IsOccupied() && tileP.OccupiedPiece != piece)
+        {    return false;}
+
+        if (apply)
+        {
+            state.perimeterIndex = nextP;
+            state.hasLeftStart = true;
+            
+            if (nextP == startIndex && state.hasLeftStart)
+            {
+                state.canEnterCenter = true;
+            }
+        }
+        
         return true;
     }
 
@@ -297,7 +290,7 @@ public class BoardGenerator : MonoBehaviour
     {
         if (perimeterPath == null || perimeterPath.Count == 0) return;
 
-        // Периметр
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         Gizmos.color = Color.cyan;
         for (int i = 0; i < perimeterPath.Count; i++)
         {
@@ -308,7 +301,7 @@ public class BoardGenerator : MonoBehaviour
             Gizmos.DrawLine(pos, next);
         }
 
-        // Центр
+        // пїЅпїЅпїЅпїЅпїЅ
         Gizmos.color = Color.yellow;
         for (int i = 0; i < centerPath.Count; i++)
         {

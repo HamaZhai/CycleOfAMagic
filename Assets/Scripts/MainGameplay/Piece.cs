@@ -3,6 +3,14 @@ using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem.LowLevel;
 
+public struct MoveState
+{
+    public int perimeterIndex;
+    public int centerIndex;
+    public bool hasLeftStart;
+    public bool canEnterCenter;
+}
+
 public class Piece : MonoBehaviour
 {
     public int perimeterIndex;
@@ -32,6 +40,27 @@ public class Piece : MonoBehaviour
         game.OnPieceClicked(this);
     }
 
+    public bool CanMove(int steps)
+    {
+        MoveState state = new MoveState
+        {
+            perimeterIndex = perimeterIndex,
+            centerIndex = centerIndex,
+            hasLeftStart = hasLeftStart,
+            canEnterCenter = canEnterCenter
+        };
+
+        for (int i = 0 ; i < steps ; i++)
+        {
+            if(!board.TryStep(ref state, this, false))
+            {   return false;}
+
+            
+        }
+
+        return true;
+    }
+
     public void Move(int steps)
     {
         StartCoroutine(MoveRoutine(steps));
@@ -39,76 +68,42 @@ public class Piece : MonoBehaviour
 
     IEnumerator MoveRoutine(int steps)
     {
+        MoveState state = new MoveState
+        {
+            perimeterIndex = perimeterIndex,
+            centerIndex = centerIndex,
+            hasLeftStart = hasLeftStart,
+            canEnterCenter = canEnterCenter
+        };
+
         while (steps-- > 0)
         {
-            // -------- CENTER MOVEMENT --------
-            if (centerIndex >= 0)
-            {
-                int next = centerIndex + 1;
+            Vector2Int from;
+            Vector2Int to;
 
-                if (next >= board.CenterPath.Count)
-                {
-                    isFinished = true;
-                    game.NotifyMoveFinished();
-                    yield break;
-                }
+            if (state.centerIndex >= 0)
+                from = board.CenterPath[state.centerIndex];
+            else
+                from = board.PerimeterPath[state.perimeterIndex];
 
-                var currentTile = board.GetTile(board.CenterPath[centerIndex]);
-                var nextTile = board.GetTile(board.CenterPath[next]);
+            if (!board.TryStep(ref state, this, true))
+                yield break;
 
-                currentTile.ClearPiece();
+            if (state.centerIndex >= 0)
+                to = board.CenterPath[state.centerIndex];
+            else
+                to = board.PerimeterPath[state.perimeterIndex];
 
-                yield return MoveTo(board.CenterPath[next]);
-
-                nextTile.SetPiece(this);
-
-                centerIndex = next;
-
-                continue;
-            }
-
-            if (canEnterCenter)
-            {
-                var centerTile = board.GetTile(board.CenterPath[0]);
-
-                if (!centerTile.IsOccupied())
-                {
-                    var currentTile = board.GetTile(board.PerimeterPath[perimeterIndex]);
-                    currentTile.ClearPiece();
-
-                    yield return MoveTo(board.CenterPath[0]);
-
-                    centerTile.SetPiece(this);
-
-                    centerIndex = 0;
-                    canEnterCenter = false;
-
-                    continue;
-                }
-
-            }
-
-            // -------- PERIMETER MOVEMENT --------
-            int nextIndex = (perimeterIndex + 1) % board.PerimeterPath.Count;
-
-            var current = board.GetTile(board.PerimeterPath[perimeterIndex]);
-            var nextTileP = board.GetTile(board.PerimeterPath[nextIndex]);
-
-            current.ClearPiece();
-
-            yield return MoveTo(board.PerimeterPath[nextIndex]);
-
-            perimeterIndex = nextIndex;
-
-            if (nextIndex == board.startIndex && hasLeftStart)
-            {
-                canEnterCenter = true;
-            }
-
-            hasLeftStart = true;
-
-            nextTileP.SetPiece(this);
+            // 🔥 CRITICAL FIX: update tiles
+            board.GetTile(from).ClearPiece();
+            yield return MoveTo(to);
+            board.GetTile(to).SetPiece(this);
         }
+
+        perimeterIndex = state.perimeterIndex;
+        centerIndex = state.centerIndex;
+        hasLeftStart = state.hasLeftStart;
+        canEnterCenter = state.canEnterCenter;
 
         game.NotifyMoveFinished();
     }
