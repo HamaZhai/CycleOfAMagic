@@ -1,243 +1,203 @@
-using JetBrains.Annotations;
 using System.Collections.Generic;
-using UnityEditor.Build;
 using UnityEngine;
 
-public class BoardGenerator : MonoBehaviour
+// BoardGenerator теперь отвечает только за:
+// 1. Генерацию путей (перimetр + центр)
+// 2. Спавн тайлов на сцене
+// 3. Перевод координат (GridToWorld)
+// 4. Предоставление состояния занятости (IBoardOccupancy)
+//
+// Логика движения вынесена в MovementRules.
+// Это значит: новое правило движения = новый метод в MovementRules,
+// а не правка этого файла.
+public class BoardGenerator : MonoBehaviour, IBoardOccupancy
 {
+    [Header("Config")]
     public float tileSize = 1f;
     public int startIndex = 0;
 
+    [Range(0.5f, 1f)]
+    public float boardPadding = 0.9f;
+
+    [Header("References")]
     public BoardManager boardManager;
     public GameController gameController;
 
-    public List<Vector2Int> PerimeterPath => perimeterPath;
-    public List<Vector2Int> CenterPath => centerPath;
+    // Публичные пути — только чтение снаружи
+    public IReadOnlyList<Vector2Int> PerimeterPath => perimeterPath;
+    public IReadOnlyList<Vector2Int> CenterPath => centerPath;
 
-    private List<Vector2Int> perimeterPath = new List<Vector2Int>();
-    private List<Vector2Int> centerPath = new List<Vector2Int>();
-
-    private List<TileInstance> spawnedTiles = new List<TileInstance>();
-
+    private List<Vector2Int> perimeterPath = new();
+    private List<Vector2Int> centerPath = new();
     private Dictionary<Vector2Int, TileInstance> tilemap = new();
 
-    [Range(0.5f, 1f)]
-    public float boardPadding = 0.9f;
+    // MovementRules создаётся после инициализации — содержит ссылку на пути и occupancy
+    private MovementRules movementRules;
 
     public void Init()
     {
         FitBoardToCamera();
         GeneratePaths(boardManager.boardSize);
         SpawnBoard();
+
+        // MovementRules получает пути и this как IBoardOccupancy.
+        // Он не знает о MonoBehaviour, сцене или Unity — только данные.
+        movementRules = new MovementRules(
+            new List<Vector2Int>(perimeterPath),
+            new List<Vector2Int>(centerPath),
+            startIndex,
+            this
+        );
     }
 
-    // ---------------- PATH GENERATION ----------------
+    // ---- IBoardOccupancy ----
 
-    void GeneratePaths(int boardSize)
+    public bool IsTileOccupied(Vector2Int pos)
+    {
+        return tilemap.TryGetValue(pos, out var tile) && tile.IsOccupied();
+    }
+
+    public Piece GetOccupant(Vector2Int pos)
+    {
+        return tilemap.TryGetValue(pos, out var tile) ? tile.OccupiedPiece : null;
+    }
+
+    // ---- Публичный API для Piece ----
+
+    public bool TryStep(ref MoveState state, Piece piece, bool apply)
+        => movementRules.TryStep(ref state, piece, apply);
+
+    public bool CanMove(Piece piece, int steps)
+        => movementRules.CanMove(piece.GetMoveState(), piece, steps);
+
+    public TileInstance GetTile(Vector2Int pos)
+    {
+        if (!tilemap.TryGetValue(pos, out var tile))
+        {
+            Debug.LogError($"[Board] Tile not found at {pos}");
+            return null;
+        }
+        return tile;
+    }
+
+    public Vector3 GridToWorld(Vector2Int gridPos)
+    {
+        Vector3 offset = GetBoardOffset();
+        return new Vector3(gridPos.x * tileSize, gridPos.y * tileSize, 0) - offset;
+    }
+
+    // ---- Генерация путей ----
+
+    private void GeneratePaths(int boardSize)
     {
         perimeterPath.Clear();
         centerPath.Clear();
 
         int max = boardSize - 1;
 
-        // --- PERIMETER ---
         for (int x = 0; x <= max; x++) perimeterPath.Add(new Vector2Int(x, 0));
         for (int y = 1; y <= max; y++) perimeterPath.Add(new Vector2Int(max, y));
         for (int x = max - 1; x >= 0; x--) perimeterPath.Add(new Vector2Int(x, max));
         for (int y = max - 1; y > 0; y--) perimeterPath.Add(new Vector2Int(0, y));
 
-        // --- CENTER ---
         int center = (boardSize - 1) / 2;
         Vector2Int start = perimeterPath[startIndex];
 
         for (int i = 1; i <= center; i++)
-        {
             centerPath.Add(new Vector2Int(start.x + i, start.y + i));
+    }
+
+    // ---- Спавн ----
+
+    private void SpawnBoard()
+    {
+        var decks = new Dictionary<TileZone, List<TileData>>
+        {
+            { TileZone.Start,    Shuffle(boardManager.startDeck) },
+            { TileZone.Progress, Shuffle(boardManager.progressDeck) },
+            { TileZone.Triumph,  Shuffle(boardManager.triumphDeck) },
+            { TileZone.Finish,   Shuffle(boardManager.finishDeck) }
+        };
+
+        var deckIndex = new Dictionary<TileZone, int>
+        {
+            { TileZone.Start, 0 }, { TileZone.Progress, 0 },
+            { TileZone.Triumph, 0 }, { TileZone.Finish, 0 }
+        };
+
+        for (int i = 0; i < perimeterPath.Count; i++)
+        {
+            SpawnPerimeterTile(i, decks, deckIndex);
+        }
+
+        foreach (var pos in centerPath)
+        {
+            SpawnCenterTile(pos);
         }
     }
 
-    // ---------------- SPAWN ----------------
-
-    void SpawnBoard()
+    private void SpawnPerimeterTile(int index, Dictionary<TileZone, List<TileData>> decks, Dictionary<TileZone, int> deckIndex)
     {
-        spawnedTiles.Clear();
+        Vector2Int pos = perimeterPath[index];
+        TileZone zone = GetZone(index);
 
-        var decksShuffled = new Dictionary<TileZone, List<TileData>>()
+        GameObject prefab = zone == TileZone.Corner
+            ? boardManager.cornerTilePrefab
+            : boardManager.defaultTilePrefab;
+
+        TileInstance instance = SpawnTile(prefab, pos);
+
+        if (zone == TileZone.Corner)
         {
-            { TileZone.Start, Shuffle(boardManager.startDeck) },
-            { TileZone.Progress, Shuffle(boardManager.progressDeck) },
-            { TileZone.Triumph, Shuffle(boardManager.triumphDeck) },
-            { TileZone.Finish, Shuffle(boardManager.finishDeck) }
-        };
+            instance.Initialize(new TileData("Corner", TileZone.Corner));
+            instance.SetHighlight(TileHighlight.Normal);
 
-        var zoneIndex = new Dictionary<TileZone, int>()
-        {
-            { TileZone.Start, 0 },
-            { TileZone.Progress, 0 },
-            { TileZone.Triumph, 0 },
-            { TileZone.Finish, 0 }
-        };
-
-        // --- PERIMETER ---
-        for (int i = 0; i < perimeterPath.Count; i++)
-        {
-            Vector2Int pos = perimeterPath[i];
-            Vector3 world = GridToWorld(pos);
-
-            TileZone zone = GetZone(i);
-
-            GameObject prefab = zone == TileZone.Corner
-                ? boardManager.cornerTilePrefab
-                : boardManager.defaultTilePrefab;
-
-            GameObject tileGO = Instantiate(prefab, world, Quaternion.identity, transform);
-            tileGO.transform.localScale = Vector3.one * tileSize;
-
-            TileInstance instance = tileGO.GetComponent<TileInstance>();
-
-            // --- CORNERS ---
-            if (zone == TileZone.Corner)
+            if (index == startIndex)
             {
-                instance.Initialize(new TileData("Corner", TileZone.Corner));
-                tileGO.GetComponent<SpriteRenderer>().color = Color.red;
-
-                if (i == startIndex)
-                {
-                    instance.isStartCorner = true;
-                    tileGO.GetComponent<SpriteRenderer>().color = Color.green;
-                }
+                instance.isStartCorner = true;
+                // Стартовая клетка — отдельный highlight через enum, не хардкод цвета
+                instance.GetComponent<SpriteRenderer>().color = Color.green;
             }
             else
             {
-                var deck = decksShuffled[zone];
-                int idx = zoneIndex[zone];
-
-                instance.Initialize(deck[idx]);
-                zoneIndex[zone]++;
+                instance.GetComponent<SpriteRenderer>().color = Color.red;
             }
-
-            instance.Init(gameController);
-            spawnedTiles.Add(instance);
-            tilemap[pos] = instance;
         }
-
-        // --- CENTER ---
-        foreach (var pos in centerPath)
+        else
         {
-            Vector3 world = GridToWorld(pos);
-
-            GameObject tileGO = Instantiate(
-                boardManager.defaultTilePrefab,
-                world,
-                Quaternion.identity,
-                transform
-            );
-
-            tileGO.transform.localScale = Vector3.one * tileSize;
-
-            TileInstance instance = tileGO.GetComponent<TileInstance>();
-
-            instance.Initialize(new TileData("Center", TileZone.Finish));
-
-            // ������� �����
-            tileGO.GetComponent<SpriteRenderer>().color = new Color(1f, 0.84f, 0f);
-
-            instance.Init(gameController);
-            spawnedTiles.Add(instance);
-            tilemap[pos] = instance;
-
+            var deck = decks[zone];
+            instance.Initialize(deck[deckIndex[zone]++]);
         }
     }
 
-    public TileInstance GetTile(Vector2Int pos)
+    private void SpawnCenterTile(Vector2Int pos)
     {
-        return tilemap[pos];
+        TileInstance instance = SpawnTile(boardManager.defaultTilePrefab, pos);
+        instance.Initialize(new TileData("Center", TileZone.Finish));
+        instance.GetComponent<SpriteRenderer>().color = new Color(1f, 0.84f, 0f);
     }
 
-    public bool TryStep(ref MoveState state, Piece piece, bool apply)
+    private TileInstance SpawnTile(GameObject prefab, Vector2Int pos)
     {
-        if(state.centerIndex >= 0)
-        {
-            int next = state.centerIndex + 1;
+        Vector3 world = GridToWorld(pos);
+        GameObject go = Instantiate(prefab, world, Quaternion.identity, transform);
+        go.transform.localScale = Vector3.one * tileSize;
 
-            if (next >= CenterPath.Count)
-            {   
-                if (apply)
-                {
-                    state.centerIndex = CenterPath.Count - 1;
-                }
+        TileInstance instance = go.GetComponent<TileInstance>();
+        instance.Init(gameController);
+        tilemap[pos] = instance;
 
-                return true;
-            }
-
-            var tile = GetTile(CenterPath[next]);
-
-            if (tile.IsOccupied() && apply && tile.OccupiedPiece != piece)
-            {    return false;}
-
-            if (apply)
-            { 
-                state.centerIndex = next;
-            }
-
-            return true;        
-        }
-
-        if (state.canEnterCenter)
-        {
-            var tile = GetTile(centerPath[0]);
-
-            if( tile.IsOccupied() && tile.OccupiedPiece != piece)
-            {   return false;}
-
-            if (apply)
-            {
-                state.centerIndex = 0;
-                state.canEnterCenter = false;
-            }
-
-            return true;
-        }
-
-        int nextP = (state.perimeterIndex + 1) % PerimeterPath.Count;
-
-        var tileP = GetTile(perimeterPath[nextP]);
-
-        if (tileP.IsOccupied() && tileP.OccupiedPiece != piece)
-        {    return false;}
-
-        if (apply)
-        {
-            state.perimeterIndex = nextP;
-            
-            if(state.perimeterIndex == startIndex)
-            {
-                state.hasLeftStart = true;
-            }
-            
-            if (nextP == startIndex && state.hasLeftStart && state.centerIndex < 0)
-            {
-                state.canEnterCenter = true;
-            }
-        }
-        
-        return true;
+        return instance;
     }
 
-    // ---------------- ZONES ----------------
+    // ---- Хелперы ----
 
-    TileZone GetZone(int index)
+    private TileZone GetZone(int index)
     {
         int b = boardManager.boardSize - 1;
+        int c1 = 0, c2 = b, c3 = 2 * b, c4 = 3 * b;
 
-        int c1 = 0;
-        int c2 = b;
-        int c3 = 2 * b;
-        int c4 = 3 * b;
-
-        if (index == c1 || index == c2 || index == c3 || index == c4)
-            return TileZone.Corner;
-
+        if (index == c1 || index == c2 || index == c3 || index == c4) return TileZone.Corner;
         if (index > c1 && index < c2) return TileZone.Start;
         if (index > c2 && index < c3) return TileZone.Progress;
         if (index > c3 && index < c4) return TileZone.Triumph;
@@ -245,85 +205,57 @@ public class BoardGenerator : MonoBehaviour
         return TileZone.Finish;
     }
 
-    // ---------------- HELPERS ----------------
-
-    public Vector3 GridToWorld(Vector2Int gridPos)
+    private Vector3 GetBoardOffset()
     {
-        Vector3 offset = GetBoardOffset();
-
-        return new Vector3(
-            gridPos.x * tileSize,
-            gridPos.y * tileSize,
-            0
-        ) - offset;
+        float worldSize = (boardManager.boardSize - 1) * tileSize;
+        return new Vector3(worldSize / 2f, worldSize / 2f, 0);
     }
 
-    Vector3 GetBoardOffset()
-    {
-        float boardWorldSize = (boardManager.boardSize - 1) * tileSize;
-        return new Vector3(boardWorldSize / 2f, boardWorldSize / 2f, 0);
-    }
-
-    void FitBoardToCamera()
+    private void FitBoardToCamera()
     {
         Camera cam = Camera.main;
+        float h = cam.orthographicSize * 2f;
+        float w = h * cam.aspect;
 
-        float screenHeight = cam.orthographicSize * 2f;
-        float screenWidth = screenHeight * cam.aspect;
+        float usableW = w * boardPadding;
+        float usableH = h * boardPadding;
 
-        float usableWidth = screenWidth * boardPadding;
-        float usableHeight = screenHeight * boardPadding;
-
-        float boardSize = boardManager.boardSize;
-
-        float sizeByWidth = usableWidth / boardSize;
-        float sizeByHeight = usableHeight / boardSize;
-
-        tileSize = Mathf.Min(sizeByWidth, sizeByHeight);
+        float size = boardManager.boardSize;
+        tileSize = Mathf.Min(usableW / size, usableH / size);
     }
 
-    List<TileData> Shuffle(List<TileData> list)
+    private List<TileData> Shuffle(List<TileData> list)
     {
         var copy = new List<TileData>(list);
-
         for (int i = copy.Count - 1; i > 0; i--)
         {
             int rnd = Random.Range(0, i + 1);
             (copy[i], copy[rnd]) = (copy[rnd], copy[i]);
         }
-
         return copy;
     }
 
-    // ---------------- GIZMOS ----------------
+    // ---- Gizmos ----
 
-    void OnDrawGizmos()
+    private void OnDrawGizmos()
     {
         if (perimeterPath == null || perimeterPath.Count == 0) return;
 
-        // ��������
         Gizmos.color = Color.cyan;
         for (int i = 0; i < perimeterPath.Count; i++)
         {
             Vector3 pos = GridToWorld(perimeterPath[i]);
             Gizmos.DrawSphere(pos, 0.1f);
-
-            Vector3 next = GridToWorld(perimeterPath[(i + 1) % perimeterPath.Count]);
-            Gizmos.DrawLine(pos, next);
+            Gizmos.DrawLine(pos, GridToWorld(perimeterPath[(i + 1) % perimeterPath.Count]));
         }
 
-        // �����
         Gizmos.color = Color.yellow;
         for (int i = 0; i < centerPath.Count; i++)
         {
             Vector3 pos = GridToWorld(centerPath[i]);
             Gizmos.DrawCube(pos, Vector3.one * 0.2f);
-
             if (i < centerPath.Count - 1)
-            {
-                Vector3 next = GridToWorld(centerPath[i + 1]);
-                Gizmos.DrawLine(pos, next);
-            }
+                Gizmos.DrawLine(pos, GridToWorld(centerPath[i + 1]));
         }
     }
 }

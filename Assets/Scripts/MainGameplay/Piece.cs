@@ -1,7 +1,5 @@
 using System.Collections;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.InputSystem.LowLevel;
 
 public struct MoveState
 {
@@ -13,15 +11,15 @@ public struct MoveState
 
 public class Piece : MonoBehaviour
 {
-    public int perimeterIndex;
-    public int centerIndex = -1;
-    public bool hasLeftStart;
-    public bool isFinished;
+    // Состояние фигуры — публичное для чтения, управляется изнутри
+    public int perimeterIndex { get; private set; }
+    public int centerIndex { get; private set; } = -1;
+    public bool hasLeftStart { get; private set; }
+    public bool canEnterCenter { get; private set; }
+    public bool IsFinished { get; private set; }
 
     private BoardGenerator board;
     private GameController game;
-
-    public bool canEnterCenter = false;
 
     public void Init(BoardGenerator b, GameController g)
     {
@@ -33,93 +31,86 @@ public class Piece : MonoBehaviour
     {
         perimeterIndex = index;
         hasLeftStart = false;
+        IsFinished = false;
     }
+
+    // Нужен BoardGenerator.CanMove — снапшот текущего состояния.
+    // Struct копируется по значению — безопасно.
+    public MoveState GetMoveState() => new MoveState
+    {
+        perimeterIndex = perimeterIndex,
+        centerIndex = centerIndex,
+        hasLeftStart = hasLeftStart,
+        canEnterCenter = canEnterCenter
+    };
 
     public void HandleClick()
     {
         game.OnPieceClicked(this);
     }
 
-    public bool CanMove(int steps)
-    {
-        MoveState state = new MoveState
-        {
-            perimeterIndex = perimeterIndex,
-            centerIndex = centerIndex,
-            hasLeftStart = hasLeftStart,
-            canEnterCenter = canEnterCenter
-        };
-
-        for (int i = 0; i < steps; i++)
-        {
-            if (!board.TryStep(ref state, this, false))
-            {
-                if (state.centerIndex >= 0)
-                    return true;
-
-                return false;
-            }
-        }
-
-        return true;
-    }
+    public bool CanMove(int steps) => board.CanMove(this, steps);
 
     public void Move(int steps)
     {
         StartCoroutine(MoveRoutine(steps));
     }
 
-    IEnumerator MoveRoutine(int steps)
+    private IEnumerator MoveRoutine(int steps)
     {
-        MoveState state = new MoveState
-        {
-            perimeterIndex = perimeterIndex,
-            centerIndex = centerIndex,
-            hasLeftStart = hasLeftStart,
-            canEnterCenter = canEnterCenter
-        };
+        MoveState state = GetMoveState();
 
         while (steps-- > 0)
         {
-            Vector2Int from;
-            Vector2Int to;
-
-            if (state.centerIndex >= 0)
-                from = board.CenterPath[state.centerIndex];
-            else
-                from = board.PerimeterPath[state.perimeterIndex];
+            Vector2Int from = GetCurrentPos(state);
 
             if (!board.TryStep(ref state, this, true))
             {
-                if(state.centerIndex >= 0)
-                {
+                // Если фигура уже в центре и уперлась — это финиш, не ошибка
+                if (state.centerIndex >= 0)
                     break;
-                }
 
                 yield break;
             }
-                
 
-            if (state.centerIndex >= 0)
-                to = board.CenterPath[state.centerIndex];
-            else
-                to = board.PerimeterPath[state.perimeterIndex];
+            Vector2Int to = GetCurrentPos(state);
 
             board.GetTile(from).ClearPiece();
             board.GetTile(to).SetPiece(this);
 
-            yield return MoveTo(to);
+            yield return AnimateMoveTo(to);
         }
 
-        perimeterIndex = state.perimeterIndex;
-        centerIndex = state.centerIndex;
-        hasLeftStart = state.hasLeftStart;
-        canEnterCenter = state.canEnterCenter;
+        // Применяем финальное состояние — только после завершения анимации
+        ApplyState(state);
+
+        // Проверка финиша — фигура в конце центрального пути
+        if (centerIndex == board.CenterPath.Count - 1)
+        {
+            IsFinished = true;
+            Debug.Log($"[Piece] {name} finished!");
+        }
 
         game.NotifyMoveFinished();
     }
 
-    IEnumerator MoveTo(Vector2Int pos)
+    private Vector2Int GetCurrentPos(MoveState state)
+    {
+        if (state.centerIndex >= 0)
+            return board.CenterPath[state.centerIndex];
+
+        return board.PerimeterPath[state.perimeterIndex];
+    }
+
+    private void ApplyState(MoveState state)
+    {
+        perimeterIndex = state.perimeterIndex;
+        centerIndex = state.centerIndex;
+        hasLeftStart = state.hasLeftStart;
+        canEnterCenter = state.canEnterCenter;
+    }
+
+    private IEnumerator AnimateMoveTo(Vector2Int pos)
     {
         Vector3 target = board.GridToWorld(pos);
 
