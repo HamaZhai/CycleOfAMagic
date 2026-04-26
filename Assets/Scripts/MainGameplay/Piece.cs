@@ -50,10 +50,15 @@ public class Piece : MonoBehaviour
             canEnterCenter = canEnterCenter
         };
 
-        for (int i = 0 ; i < steps ; i++)
+        for (int i = 0; i < steps; i++)
         {
-            if(!board.TryStep(ref state, this, false))
-            {   return false;}
+            if (!board.TryStep(ref state, this, false))
+            {
+                if (state.centerIndex >= 0)
+                    return true;
+
+                return false;
+            }
         }
 
         return true;
@@ -85,7 +90,15 @@ public class Piece : MonoBehaviour
                 from = board.PerimeterPath[state.perimeterIndex];
 
             if (!board.TryStep(ref state, this, true))
+            {
+                if(state.centerIndex >= 0)
+                {
+                    break;
+                }
+
                 yield break;
+            }
+                
 
             if (state.centerIndex >= 0)
                 to = board.CenterPath[state.centerIndex];

@@ -161,7 +161,14 @@ public class BoardGenerator : MonoBehaviour
             int next = state.centerIndex + 1;
 
             if (next >= CenterPath.Count)
-            {   return false;}
+            {   
+                if (apply)
+                {
+                    state.centerIndex = CenterPath.Count - 1;
+                }
+
+                return true;
+            }
 
             var tile = GetTile(CenterPath[next]);
 
