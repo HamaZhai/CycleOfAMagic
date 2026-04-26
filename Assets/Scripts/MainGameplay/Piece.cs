@@ -54,8 +54,6 @@ public class Piece : MonoBehaviour
         {
             if(!board.TryStep(ref state, this, false))
             {   return false;}
-
-            
         }
 
         return true;
@@ -94,10 +92,10 @@ public class Piece : MonoBehaviour
             else
                 to = board.PerimeterPath[state.perimeterIndex];
 
-            // 🔥 CRITICAL FIX: update tiles
             board.GetTile(from).ClearPiece();
-            yield return MoveTo(to);
             board.GetTile(to).SetPiece(this);
+
+            yield return MoveTo(to);
         }
 
         perimeterIndex = state.perimeterIndex;

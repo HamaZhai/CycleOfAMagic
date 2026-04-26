@@ -3,9 +3,9 @@ using UnityEngine;
 [System.Serializable]
 public class TileData
 {
-    public string tileName;    // уникальное имя
-    public TileZone zone;      // зона
-    public string effect = ""; // слот под эффект
+    public string tileName;    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ
+    public TileZone zone;      // пїЅпїЅпїЅпїЅ
+    public string effect = ""; // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 
     public TileData(string name, TileZone zone)
     {

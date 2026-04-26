@@ -75,7 +75,11 @@ public class GameController : MonoBehaviour
         Vector2Int start = board.PerimeterPath[board.startIndex];
         TileInstance tile = board.GetTile(start);
 
-        if (tile.IsOccupied()) return;
+        if (tile.IsOccupied()) 
+        {
+            Debug.LogError("Start tile is occupied by: " + tile.OccupiedPiece);
+            return;
+        }
 
         GameObject obj = Instantiate(piecePrefab, board.GridToWorld(start), Quaternion.identity);
 

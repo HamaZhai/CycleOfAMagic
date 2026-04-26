@@ -202,9 +202,13 @@ public class BoardGenerator : MonoBehaviour
         if (apply)
         {
             state.perimeterIndex = nextP;
-            state.hasLeftStart = true;
             
-            if (nextP == startIndex && state.hasLeftStart)
+            if(state.perimeterIndex == startIndex)
+            {
+                state.hasLeftStart = true;
+            }
+            
+            if (nextP == startIndex && state.hasLeftStart && state.centerIndex < 0)
             {
                 state.canEnterCenter = true;
             }
