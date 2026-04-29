@@ -50,11 +50,5 @@ public class GameStarter : MonoBehaviour
     }
 
     // Для тестирования в редакторе — старт по пробелу
-    private void Update()
-    {
-#if UNITY_EDITOR
-        if (Input.GetKeyDown(KeyCode.Space))
-            gameController.StartGame();
-#endif
-    }
+    
 }

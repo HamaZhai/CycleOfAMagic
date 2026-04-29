@@ -18,14 +18,24 @@ public class GameController : MonoBehaviour
     public GameObject piecePrefab;
     public VictoryCondition victoryCondition;
 
+    [Header("Systems")]
+    public TrailSystem trailSystem;
+    public PrioritySystem prioritySystem;
+    public InactivitySystem inactivitySystem;
+
+
     public GameState State { get; private set; } = GameState.Initializing;
     public int CurrentDiceValue { get; private set; }
 
     public System.Action OnGameStarted;
     public System.Action OnTurnEnded;
     public System.Action<VictoryCondition.VictoryResult> OnGameOver;
+    public System.Action<Piece> OnEnteredCenter;
 
     private readonly List<Piece> pieces = new();
+    private Piece lastMovedPiece;
+
+    private int nextCenterSlot;
 
     private void Start()
     {
@@ -37,6 +47,8 @@ public class GameController : MonoBehaviour
         victoryCondition.OnVictory += HandleVictory;
 
         SpawnFirstPiece();
+
+        nextCenterSlot = board.CenterPath.Count - 1; // стартуем с дальнего конца центра
     }
 
     public void StartGame()
@@ -61,7 +73,7 @@ public class GameController : MonoBehaviour
         if (!canSpawn && !HasAnyValidMoves(CurrentDiceValue))
         {
             Debug.Log($"[Game] No valid moves for dice {value} -- skipping turn");
-            EndTurn();
+            EndTurn(null);
             return;
         }
 
@@ -90,7 +102,7 @@ public class GameController : MonoBehaviour
         }
 
         CreatePiece();
-        EndTurn();
+        EndTurn(null);
     }
 
     public void OnPieceClicked(Piece piece)
@@ -100,17 +112,38 @@ public class GameController : MonoBehaviour
         if (piece.IsFinished) return;
         if (!piece.CanMove(CurrentDiceValue)) return;
 
-        State = GameState.Moving;
+         // 🟨 Конфликт Приоритетов: если обязаны двигать приоритетную — блокируем другие
+        if (prioritySystem.MustMovePriority() && piece != prioritySystem.GetPriorityPiece())
+        {
+            prioritySystem.TriggerAttentionPulse(); // ← добавить
+            Debug.Log($"[Priority] Must move priority piece: {prioritySystem.GetPriorityPiece()?.name}");
+            return;
+        }
 
-        int move = CurrentDiceValue;
+        // 🟥 Конфликт Времени: применяем штраф за бездействие
+        int steps = inactivitySystem.ApplyPenalty(piece, CurrentDiceValue);
+        
+        if (!piece.CanMove(steps))
+        {
+            // Попробуем хотя бы 1 шаг если штраф срезал слишком много
+            if (steps > 1 && piece.CanMove(1)) steps = 1;
+            else return;
+        }
+
+        State = GameState.Moving;
+        lastMovedPiece = piece;
         CurrentDiceValue = 0;
 
-        piece.Move(move);
+        piece.Move(steps);
     }
-
-    public void NotifyMoveFinished()
+    
+    // Вызывается из Piece по окончании движения
+    public void NotifyMoveFinished(Piece piece, Vector2Int fromPos)
     {
-        EndTurn();
+        // Назначение слота убрано отсюда — теперь в OnPieceEnteredCenter
+        TileInstance tile = board.GetTile(fromPos);
+        trailSystem.RegisterTrail(fromPos, tile);
+        EndTurn(piece);
     }
 
     private void CreatePiece()
@@ -123,14 +156,35 @@ public class GameController : MonoBehaviour
         piece.Init(board, this);
         piece.PlaceAtStart(board.startIndex);
 
+        OnEnteredCenter += OnPieceEnteredCenter;
         board.GetTile(startPos).SetPiece(piece);
         pieces.Add(piece);
+
+        // Регистрируем в системе бездействия
+        inactivitySystem.RegisterPiece(piece);
     }
 
-    private void EndTurn()
+    private void OnPieceEnteredCenter(Piece piece)
+    {
+        if (piece.assignedCenterSlot >= 0) return; // уже назначен, игнорируем повторные входы
+
+        piece.AssignCenterSlot(nextCenterSlot);
+        nextCenterSlot = Mathf.Max(0, nextCenterSlot - 1); // двигаемся от конца к началу центра
+        Debug.Log($"[Game] {piece.name} entered center, assigned slot {piece.assignedCenterSlot}");
+    }
+
+    private void EndTurn(Piece movedPiece)
     {
         CurrentDiceValue = 0;
 
+        // Обновляем системы конфликтов
+        if (movedPiece != null)
+        {
+            prioritySystem.OnTurnEnd(movedPiece, pieces, board);
+            inactivitySystem.OnTurnEnd(movedPiece, pieces);
+        }
+
+        trailSystem.TickDown();
         // Проверка победы до смены состояния.
         // Если HandleVictory уже перевёл в GameOver -- не перезаписываем WaitingRoll.
         victoryCondition.CheckAfterTurn();

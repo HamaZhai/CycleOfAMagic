@@ -9,16 +9,13 @@ public enum TileZone
     Finish
 }
 
-// Все визуальные состояния плитки через enum.
-// Когда добавишь эффекты — просто добавляешь новый вариант сюда.
-// Никакой магии с цветами разбросанной по коду.
 public enum TileHighlight
 {
-    Normal,         // базовое состояние
-    Occupied,       // на клетке стоит фигура
-    Available,      // можно ходить сюда (для подсветки допустимых ходов)
-    Effect,         // клетка имеет активный эффект (плитка сработала)
-    Selected        // выбрана игроком
+    Normal,
+    Occupied,
+    Available,
+    Effect,
+    Selected
 }
 
 [RequireComponent(typeof(SpriteRenderer), typeof(Collider2D))]
@@ -33,12 +30,8 @@ public class TileInstance : MonoBehaviour
     private GameController game;
     private Color baseColor;
 
-    // Текущий highlight — публичный для чтения, приватный для записи.
-    // Другие системы видят состояние, но не пишут напрямую.
     public TileHighlight CurrentHighlight { get; private set; } = TileHighlight.Normal;
 
-    // Цвета вынесены в инспектор — дизайнер меняет без программиста.
-    // Сериализованы, поэтому не сбрасываются при компиляции.
     [Header("Highlight Colors")]
     [SerializeField] private Color occupiedColor = Color.magenta;
     [SerializeField] private Color availableColor = Color.cyan;
@@ -65,8 +58,9 @@ public class TileInstance : MonoBehaviour
 
     public bool IsOccupied() => OccupiedPiece != null;
 
-    // SetPiece и ClearPiece теперь только меняют данные.
-    // Визуал — через SetHighlight. Разделение ответственности.
+    // Возвращает базовый цвет тайла — нужен TrailSystem для восстановления цвета
+    public Color GetBaseColor() => baseColor;
+
     public void SetPiece(Piece piece)
     {
         if (OccupiedPiece != null)
@@ -85,8 +79,6 @@ public class TileInstance : MonoBehaviour
         SetHighlight(TileHighlight.Normal);
     }
 
-    // Единственный метод для изменения визуала.
-    // Добавить новый эффект = добавить case сюда.
     public void SetHighlight(TileHighlight highlight)
     {
         CurrentHighlight = highlight;
@@ -105,8 +97,6 @@ public class TileInstance : MonoBehaviour
     public void HandleClick()
     {
         if (isStartCorner)
-        {
             game.OnStartTileClicked();
-        }
     }
 }

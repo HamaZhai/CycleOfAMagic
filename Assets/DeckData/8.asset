@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 63f6ceb75ad944049a1c3d7d42c250d4, type: 3}
-  m_Name: 10
+  m_Name: 8
   m_EditorClassIdentifier: Assembly-CSharp::BoardManager
-  boardSize: 10
+  boardSize: 8
   defaultTilePrefab: {fileID: 7741288560753764945, guid: a7a9b14a5d364c94da741f40e9b9de04, type: 3}
   cornerTilePrefab: {fileID: 7741288560753764945, guid: 13c96cf0287fa8c4fbff22f802c42e46, type: 3}
   startDeck:
@@ -34,12 +34,6 @@ MonoBehaviour:
   - tileName: Start_5
     zone: 1
     effect: 
-  - tileName: Start_6
-    zone: 1
-    effect: 
-  - tileName: Start_7
-    zone: 1
-    effect: 
   progressDeck:
   - tileName: Progress_0
     zone: 2
@@ -57,12 +51,6 @@ MonoBehaviour:
     zone: 2
     effect: 
   - tileName: Progress_5
-    zone: 2
-    effect: 
-  - tileName: Progress_6
-    zone: 2
-    effect: 
-  - tileName: Progress_7
     zone: 2
     effect: 
   triumphDeck:
@@ -84,12 +72,6 @@ MonoBehaviour:
   - tileName: Triumph_5
     zone: 3
     effect: 
-  - tileName: Triumph_6
-    zone: 3
-    effect: 
-  - tileName: Triumph_7
-    zone: 3
-    effect: 
   finishDeck:
   - tileName: Finish_0
     zone: 4
@@ -107,11 +89,5 @@ MonoBehaviour:
     zone: 4
     effect: 
   - tileName: Finish_5
-    zone: 4
-    effect: 
-  - tileName: Finish_6
-    zone: 4
-    effect: 
-  - tileName: Finish_7
     zone: 4
     effect: 

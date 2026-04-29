@@ -17,9 +17,22 @@ public class Piece : MonoBehaviour
     public bool hasLeftStart { get; private set; }
     public bool canEnterCenter { get; private set; }
     public bool IsFinished { get; private set; }
+    public PieceVisuals Visuals { get; private set; }
 
     private BoardGenerator board;
     private GameController game;
+
+    public int assignedCenterSlot { get; private set; } = -1; // -1 = не назначен
+
+    public void AssignCenterSlot(int slot)
+    {
+        assignedCenterSlot = slot;
+    }
+
+    private void Awake()
+    {
+        Visuals = GetComponent<PieceVisuals>();
+    }
 
     public void Init(BoardGenerator b, GameController g)
     {
@@ -56,42 +69,49 @@ public class Piece : MonoBehaviour
         StartCoroutine(MoveRoutine(steps));
     }
 
-    private IEnumerator MoveRoutine(int steps)
+   private IEnumerator MoveRoutine(int steps)
     {
         MoveState state = GetMoveState();
+ 
+        Vector2Int startPos = GetCurrentPos(state);
 
         while (steps-- > 0)
         {
             Vector2Int from = GetCurrentPos(state);
-
+            bool WasInCenter = state.centerIndex >= 0;
+ 
             if (!board.TryStep(ref state, this, true))
             {
-                // Если фигура уже в центре и уперлась — это финиш, не ошибка
-                if (state.centerIndex >= 0)
-                    break;
-
-                yield break;
+                break;
             }
-
+ 
+            if (!WasInCenter && state.centerIndex >= 0)
+            {
+                // Вошли в центр — уведомляем GameController для статистики и возможного ИИ
+                game.OnEnteredCenter?.Invoke(this);
+            }
             Vector2Int to = GetCurrentPos(state);
-
+ 
             board.GetTile(from).ClearPiece();
             board.GetTile(to).SetPiece(this);
-
+ 
             yield return AnimateMoveTo(to);
         }
-
-        // Применяем финальное состояние — только после завершения анимации
+ 
         ApplyState(state);
+ 
+        bool reachedAssignedSlot = assignedCenterSlot >= 0 && centerIndex == assignedCenterSlot;
+        bool reachedEnd = centerIndex == board.CenterPath.Count - 1;
 
-        // Проверка финиша — фигура в конце центрального пути
-        if (centerIndex == board.CenterPath.Count - 1)
+        // Проверка финиша — фигура дошла до конца центрального пути
+        if (reachedAssignedSlot || reachedEnd)
         {
             IsFinished = true;
+            Visuals?.SetState(PieceVisualState.Finished);
             Debug.Log($"[Piece] {name} finished!");
         }
 
-        game.NotifyMoveFinished();
+        game.NotifyMoveFinished(this, startPos);
     }
 
     private Vector2Int GetCurrentPos(MoveState state)
@@ -116,7 +136,7 @@ public class Piece : MonoBehaviour
 
         while ((transform.position - target).sqrMagnitude > 0.001f)
         {
-            transform.position = Vector3.MoveTowards(transform.position, target, 6f * Time.deltaTime);
+            transform.position = Vector3.MoveTowards(transform.position, target, 12f * Time.deltaTime);
             yield return null;
         }
 

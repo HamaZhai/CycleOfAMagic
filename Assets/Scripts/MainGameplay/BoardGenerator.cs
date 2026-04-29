@@ -46,7 +46,8 @@ public class BoardGenerator : MonoBehaviour, IBoardOccupancy
             new List<Vector2Int>(perimeterPath),
             new List<Vector2Int>(centerPath),
             startIndex,
-            this
+            this,
+            gameController.trailSystem
         );
     }
 

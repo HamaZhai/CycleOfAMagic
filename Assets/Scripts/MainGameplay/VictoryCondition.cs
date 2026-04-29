@@ -84,7 +84,7 @@ public class VictoryCondition : MonoBehaviour
  
         foreach (var pos in centerPath)
         {
-            if (!board.IsTileOccupied(pos))
+            if (!board.IsTileOccupied(pos)) 
                 return false;
         }
  
