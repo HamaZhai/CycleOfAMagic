@@ -1,15 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// BoardGenerator теперь отвечает только за:
-// 1. Генерацию путей (перimetр + центр)
-// 2. Спавн тайлов на сцене
-// 3. Перевод координат (GridToWorld)
-// 4. Предоставление состояния занятости (IBoardOccupancy)
-//
-// Логика движения вынесена в MovementRules.
-// Это значит: новое правило движения = новый метод в MovementRules,
-// а не правка этого файла.
 public class BoardGenerator : MonoBehaviour, IBoardOccupancy
 {
     [Header("Config")]
@@ -23,7 +14,6 @@ public class BoardGenerator : MonoBehaviour, IBoardOccupancy
     public BoardManager boardManager;
     public GameController gameController;
 
-    // Публичные пути — только чтение снаружи
     public IReadOnlyList<Vector2Int> PerimeterPath => perimeterPath;
     public IReadOnlyList<Vector2Int> CenterPath => centerPath;
 
@@ -31,7 +21,6 @@ public class BoardGenerator : MonoBehaviour, IBoardOccupancy
     private List<Vector2Int> centerPath = new();
     private Dictionary<Vector2Int, TileInstance> tilemap = new();
 
-    // MovementRules создаётся после инициализации — содержит ссылку на пути и occupancy
     private MovementRules movementRules;
 
     public void Init()
@@ -40,28 +29,21 @@ public class BoardGenerator : MonoBehaviour, IBoardOccupancy
         GeneratePaths(boardManager.boardSize);
         SpawnBoard();
 
-        // MovementRules получает пути и this как IBoardOccupancy.
-        // Он не знает о MonoBehaviour, сцене или Unity — только данные.
         movementRules = new MovementRules(
             new List<Vector2Int>(perimeterPath),
             new List<Vector2Int>(centerPath),
             startIndex,
-            this,
-            gameController.trailSystem
+            this
         );
     }
 
     // ---- IBoardOccupancy ----
 
     public bool IsTileOccupied(Vector2Int pos)
-    {
-        return tilemap.TryGetValue(pos, out var tile) && tile.IsOccupied();
-    }
+        => tilemap.TryGetValue(pos, out var tile) && tile.IsOccupied();
 
     public Piece GetOccupant(Vector2Int pos)
-    {
-        return tilemap.TryGetValue(pos, out var tile) ? tile.OccupiedPiece : null;
-    }
+        => tilemap.TryGetValue(pos, out var tile) ? tile.OccupiedPiece : null;
 
     // ---- Публичный API для Piece ----
 
@@ -70,6 +52,12 @@ public class BoardGenerator : MonoBehaviour, IBoardOccupancy
 
     public bool CanMove(Piece piece, int steps)
         => movementRules.CanMove(piece.GetMoveState(), piece, steps);
+
+    public bool TryGetMoveDestination(Piece piece, int steps, out Vector2Int destination)
+        => movementRules.TryGetDestination(piece.GetMoveState(), piece, steps, out destination);
+
+    public Vector2Int GetPiecePosition(Piece piece)
+        => movementRules.GetCurrentPosition(piece.GetMoveState());
 
     public TileInstance GetTile(Vector2Int pos)
     {
@@ -127,14 +115,10 @@ public class BoardGenerator : MonoBehaviour, IBoardOccupancy
         };
 
         for (int i = 0; i < perimeterPath.Count; i++)
-        {
             SpawnPerimeterTile(i, decks, deckIndex);
-        }
 
         foreach (var pos in centerPath)
-        {
             SpawnCenterTile(pos);
-        }
     }
 
     private void SpawnPerimeterTile(int index, Dictionary<TileZone, List<TileData>> decks, Dictionary<TileZone, int> deckIndex)
@@ -156,7 +140,6 @@ public class BoardGenerator : MonoBehaviour, IBoardOccupancy
             if (index == startIndex)
             {
                 instance.isStartCorner = true;
-                // Стартовая клетка — отдельный highlight через enum, не хардкод цвета
                 instance.GetComponent<SpriteRenderer>().color = Color.green;
             }
             else

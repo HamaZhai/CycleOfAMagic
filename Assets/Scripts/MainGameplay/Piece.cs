@@ -108,6 +108,7 @@ public class Piece : MonoBehaviour
         {
             IsFinished = true;
             Visuals?.SetState(PieceVisualState.Finished);
+            Visuals?.SetPenaltyDisplay(0); // убираем метку штрафа при финише
             Debug.Log($"[Piece] {name} finished!");
         }
 

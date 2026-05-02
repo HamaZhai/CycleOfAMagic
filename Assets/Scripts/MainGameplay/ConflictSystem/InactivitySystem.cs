@@ -1,16 +1,19 @@
 using System.Collections.Generic;
 using UnityEngine;
-using DG.Tweening;
 
-// Фигура не двигалась 2 хода подряд → следующий ход -1 шаг (минимум 1).
-// При применении штрафа фигура пульсирует оранжевым.
+// Система инерции фигур — v0.5
+//
+// Если фигура НЕ двигалась N ходов подряд:
+//   idle = 1 → штраф -1 к броску
+//   idle = 2 → штраф -2 к броску
+//   (и т.д. — штраф = кол-во пропущенных ходов)
+//
+// Штраф применяется к ИТОГОВОМУ броску, не к шагам конкретной фигуры.
+// Если итог ≤ 0 — GameController объявляет проигрыш.
+//
+// Визуал: фигура с активным штрафом пульсирует оранжевым при выборе.
 public class InactivitySystem : MonoBehaviour
 {
-    [Header("Penalty Visual")]
-    [SerializeField] private Color penaltyColor = new Color(1f, 0.5f, 0f, 1f); // оранжевый
-    [SerializeField] private float pulseInterval = 0.18f;
-    [SerializeField] private int pulseCount = 4; // кол-во вспышек
-
     private readonly Dictionary<Piece, int> idleTurns = new();
 
     public void RegisterPiece(Piece piece)
@@ -18,7 +21,12 @@ public class InactivitySystem : MonoBehaviour
         idleTurns[piece] = 0;
     }
 
-    // Вызывается после хода. Обновляет счётчики для всех фигур.
+    public void UnregisterPiece(Piece piece)
+    {
+        idleTurns.Remove(piece);
+    }
+
+    // Вызывается после каждого хода. Обновляет счётчики всех активных фигур.
     public void OnTurnEnd(Piece movedPiece, List<Piece> allPieces)
     {
         foreach (var p in allPieces)
@@ -35,49 +43,36 @@ public class InactivitySystem : MonoBehaviour
             else
             {
                 idleTurns[p]++;
-                Debug.Log($"[Inactivity] {p.name} idle {idleTurns[p]} turn(s)");
+                Debug.Log($"[Inactivity] {p.name} idle {idleTurns[p]} turn(s) → penalty -{idleTurns[p]}");
             }
         }
     }
 
-    // Возвращает финальное количество шагов с учётом штрафа.
-    // Если штраф применяется — запускает визуальный пульс на фигуре.
-    public int ApplyPenalty(Piece piece, int diceValue)
+    // Возвращает суммарный штраф для выбранной фигуры.
+    // Штраф = кол-во ходов простоя (idle turns).
+    // Если штраф > 0 — запускает визуальный сигнал на фигуре.
+    public int GetPenalty(Piece piece)
     {
-        if (!idleTurns.TryGetValue(piece, out int idle)) return diceValue;
-        if (idle < 2) return diceValue;
-
-        int penalized = Mathf.Max(1, diceValue - 1);
-        Debug.Log($"[Inactivity] {piece.name} penalized: {diceValue} → {penalized}");
-
-        piece.Visuals?.SetState(PieceVisualState.Penalty);
-
-        return penalized;
+        if (!idleTurns.TryGetValue(piece, out int idle)) return 0;
+        return idle; // штраф = idle напрямую
     }
 
-    // PlayPenaltyPulse — удалить полностью
+    // Применяет штраф к броску и возвращает итоговое значение.
+    // Итог может быть ≤ 0 — GameController должен проверить это и объявить проигрыш.
+    public int ApplyPenalty(Piece piece, int diceValue)
+    {
+        int penalty = GetPenalty(piece);
+        if (penalty == 0) return diceValue;
+
+        int result = diceValue - penalty;
+        Debug.Log($"[Inactivity] {piece.name} penalized: {diceValue} - {penalty} = {result}");
+
+        // Показываем штраф визуально
+        piece.Visuals?.SetState(PieceVisualState.Penalty);
+
+        return result;
+    }
 
     public int GetIdleTurns(Piece piece) =>
         idleTurns.TryGetValue(piece, out int v) ? v : 0;
-
-    // ── визуал штрафа ─────────────────────────────────────────
-
-    private void PlayPenaltyPulse(Piece piece)
-    {
-        var sr = piece.GetComponent<SpriteRenderer>();
-        if (sr == null) return;
-
-        Color original = sr.color;
-        sr.DOKill();
-
-        // pulseCount вспышек туда-обратно
-        sr.DOColor(penaltyColor, pulseInterval)
-          .SetLoops(pulseCount * 2, LoopType.Yoyo)
-          .SetEase(Ease.InOutFlash)
-          .OnComplete(() =>
-          {
-              // Восстанавливаем исходный цвет после анимации
-              sr.DOColor(original, pulseInterval * 0.5f);
-          });
-    }
 }

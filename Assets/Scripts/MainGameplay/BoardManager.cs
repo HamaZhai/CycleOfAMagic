@@ -4,7 +4,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "BoardManager", menuName = "Board/Manager")]
 public class BoardManager : ScriptableObject
 {
-    public int boardSize = 10;
+    public int boardSize = 8;
 
     // ��� ��������� �������
     public GameObject defaultTilePrefab;

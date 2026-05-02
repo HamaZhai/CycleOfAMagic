@@ -7,26 +7,33 @@ public interface IBoardOccupancy
     Piece GetOccupant(Vector2Int pos);
 }
 
+// MovementRules v0.5
+//
+// Правило точного входа в центр:
+//   Нельзя пройти МИМО входа (продолжить по периметру после старта).
+//   Нельзя пройти НАСКВОЗЬ (выйти за конец centerPath).
+//   Можно войти в середину центра если шагов ровно столько.
+//
+//   Реализация: CanMove не блокирует canEnterCenter в середине пути —
+//   TryStep сам маршрутизирует через TryEnterCenter → TryStepInCenter.
+//   Переполнение ловит TryStepInCenter (next >= centerPath.Count → false).
 public class MovementRules
 {
     private readonly List<Vector2Int> perimeterPath;
     private readonly List<Vector2Int> centerPath;
     private readonly int startIndex;
     private readonly IBoardOccupancy occupancy;
-    private readonly TrailSystem trailSystem;
 
     public MovementRules(
         List<Vector2Int> perimeterPath,
         List<Vector2Int> centerPath,
         int startIndex,
-        IBoardOccupancy occupancy,
-        TrailSystem trailSystem)
+        IBoardOccupancy occupancy)
     {
         this.perimeterPath = perimeterPath;
         this.centerPath = centerPath;
         this.startIndex = startIndex;
         this.occupancy = occupancy;
-        this.trailSystem = trailSystem;
     }
 
     public bool TryStep(ref MoveState state, Piece movingPiece, bool apply)
@@ -40,40 +47,61 @@ public class MovementRules
         return TryStepOnPerimeter(ref state, movingPiece, apply);
     }
 
+    // Проверяет может ли фигура пройти ровно steps шагов.
+    //
+    // Точный вход реализован через TryStep:
+    //   — если фигура на старте (canEnterCenter=true), TryStep идёт в TryEnterCenter,
+    //     а не продолжает по периметру — обход невозможен автоматически.
+    //   — если внутри центра шагов больше чем осталось клеток — TryStepInCenter
+    //     вернёт false (next >= centerPath.Count).
+    //
+    // Дополнительная проверка: если фигура УЖЕ стоит с canEnterCenter=true
+    // и шагов больше чем клеток в центре — сразу false (экономим итерации).
     public bool CanMove(MoveState state, Piece piece, int steps)
     {
+        return TryGetDestination(state, piece, steps, out _);
+    }
+
+    public bool TryGetDestination(MoveState state, Piece piece, int steps, out Vector2Int destination)
+    {
+        destination = GetCurrentPosition(state);
+
+        if (steps <= 0)
+            return false;
+
+        // Быстрая проверка переполнения: фигура уже готова войти,
+        // но шагов больше чем весь центр вмещает.
+        if (state.canEnterCenter && steps > centerPath.Count)
+            return false;
+
         for (int i = 0; i < steps; i++)
         {
-            bool wasInCenter = state.centerIndex >= 0;
-            bool couldEnterCenter = state.canEnterCenter;
-
-            // apply=true на копии (struct) — state реально двигается вперёд
             if (!TryStep(ref state, piece, apply: true))
-            {
-                if (wasInCenter || couldEnterCenter)
-                    return i > 0;
-    
                 return false;
-            }
         }
 
+        destination = GetCurrentPosition(state);
         return true;
+    }
+
+    public Vector2Int GetCurrentPosition(MoveState state)
+    {
+        if (state.centerIndex >= 0)
+            return centerPath[state.centerIndex];
+
+        return perimeterPath[state.perimeterIndex];
     }
 
     private bool TryStepInCenter(ref MoveState state, Piece movingPiece, bool apply)
     {
         int next = state.centerIndex + 1;
 
+        // Переполнение — за конец центра выйти нельзя
         if (next >= centerPath.Count)
-        {
-            // apply=true: анимация дошла до конца, останавливаемся.
-            // apply=false: симуляция CanMove — двигаться некуда, возвращаем false.
-            if (apply) state.centerIndex = centerPath.Count - 1;
-            return apply;
-        }
+            return false;
 
         Vector2Int nextPos = centerPath[next];
-        if (IsTileBlockedByOther(nextPos, movingPiece))
+        if (IsOccupiedByOther(nextPos, movingPiece))
             return false;
 
         if (apply) state.centerIndex = next;
@@ -84,7 +112,7 @@ public class MovementRules
     {
         Vector2Int centerEntry = centerPath[0];
 
-        if (IsTileBlockedByOther(centerEntry, movingPiece))
+        if (IsOccupiedByOther(centerEntry, movingPiece))
             return false;
 
         if (apply)
@@ -101,21 +129,16 @@ public class MovementRules
         int next = (state.perimeterIndex + 1) % perimeterPath.Count;
         Vector2Int nextPos = perimeterPath[next];
 
-        if (IsTileBlockedByOther(nextPos, movingPiece))
+        if (IsOccupiedByOther(nextPos, movingPiece))
             return false;
 
         if (apply)
         {
-            // hasLeftStart выставляем когда фигура УХОДИТ со стартовой клетки —
-            // то есть когда текущая позиция = старт, а следующая уже нет.
-            // Это гарантирует что фигура действительно сделала хотя бы один шаг.
             if (state.perimeterIndex == startIndex && !state.hasLeftStart)
                 state.hasLeftStart = true;
 
             state.perimeterIndex = next;
 
-            // canEnterCenter — когда фигура возвращается на старт после круга.
-            // Проверяем hasLeftStart который уже true — значит фигура уходила.
             if (next == startIndex && state.hasLeftStart)
                 state.canEnterCenter = true;
         }
@@ -123,12 +146,8 @@ public class MovementRules
         return true;
     }
 
-    private bool IsTileBlockedByOther(Vector2Int pos, Piece movingPiece)
+    private bool IsOccupiedByOther(Vector2Int pos, Piece movingPiece)
     {
-        // 🟦 Конфликт Пространства: клетка заблокирована следом
-        if (trailSystem != null && trailSystem.IsTrailBlocked(pos))
-        return true;
-
         if (!occupancy.IsTileOccupied(pos)) return false;
         return occupancy.GetOccupant(pos) != movingPiece;
     }

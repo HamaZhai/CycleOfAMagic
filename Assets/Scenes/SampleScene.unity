@@ -537,8 +537,6 @@ MonoBehaviour:
   board: {fileID: 1782639501}
   piecePrefab: {fileID: 7080410346830726531, guid: af6560928369ba6408dd3d5f9c567b15, type: 3}
   victoryCondition: {fileID: 386766889}
-  trailSystem: {fileID: 1947856197}
-  prioritySystem: {fileID: 1947856196}
   inactivitySystem: {fileID: 1947856195}
 --- !u!4 &1080128565
 Transform:
@@ -730,7 +728,7 @@ MonoBehaviour:
   tileSize: 0.5
   startIndex: 0
   boardPadding: 0.9
-  boardManager: {fileID: 11400000, guid: 4fa6a965b0594144cadfed44f86ded56, type: 2}
+  boardManager: {fileID: 11400000, guid: 09a8068a88ba3bf4ab9ced3a14115a1d, type: 2}
   gameController: {fileID: 1080128564}
 --- !u!4 &1782639502
 Transform:
@@ -1065,9 +1063,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 371c6324f804c764bade57500a4f2b4b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InactivitySystem
-  penaltyColor: {r: 1, g: 0.5, b: 0, a: 1}
-  pulseInterval: 0.18
-  pulseCount: 4
 --- !u!114 &1947856196
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1080,8 +1075,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fce4dcc58dbadf44889ecc13932d102e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrioritySystem
-  priorityColor: {r: 0.2, g: 1, b: 0.2, a: 1}
-  pulseDuration: 0.5
 --- !u!114 &1947856197
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1094,8 +1087,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 08a6fe081dbc24c4c90cdf8cb9c7afd2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NewMonoBehaviourScript
-  trailColor: {r: 0.8, g: 0.3, b: 1, a: 1}
-  fadeDuration: 0.35
 --- !u!1 &1957519507
 GameObject:
   m_ObjectHideFlags: 0
@@ -1249,7 +1240,7 @@ MonoBehaviour:
   - {fileID: -1672161, guid: c3cb86097665d584bb2188a30c6275ba, type: 3}
   - {fileID: 1780910445, guid: c3cb86097665d584bb2188a30c6275ba, type: 3}
   - {fileID: 527383274, guid: c3cb86097665d584bb2188a30c6275ba, type: 3}
-  rollDuration: 0.2
+  rollDuration: 0.411
   rollSpeed: 0.05
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

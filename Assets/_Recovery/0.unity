@@ -727,7 +727,7 @@ MonoBehaviour:
   tileSize: 0.5
   startIndex: 0
   boardPadding: 0.9
-  boardManager: {fileID: 11400000, guid: 09a8068a88ba3bf4ab9ced3a14115a1d, type: 2}
+  boardManager: {fileID: 11400000, guid: 4fa6a965b0594144cadfed44f86ded56, type: 2}
   gameController: {fileID: 1080128564}
 --- !u!4 &1782639502
 Transform:

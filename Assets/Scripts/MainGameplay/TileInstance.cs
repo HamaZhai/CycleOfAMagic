@@ -96,7 +96,6 @@ public class TileInstance : MonoBehaviour
 
     public void HandleClick()
     {
-        if (isStartCorner)
-            game.OnStartTileClicked();
+        game.OnTileClicked(this);
     }
 }

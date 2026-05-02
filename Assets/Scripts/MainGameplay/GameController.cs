@@ -10,19 +10,27 @@ public enum GameState
     GameOver
 }
 
+// GameController v0.5
+//
+// Два режима после броска:
+//
+// ActivePieceCount() == 0 → режим ожидания спавна
+//   Любой бросок != 6 игнорируется (возвращаемся в WaitingRoll).
+//   Бросок == 6 → спавн, если старт свободен.
+//
+// ActivePieceCount() >= 1 → режим игры
+//   Проверяем HasAnyValidAction. Нет ни одного → проигрыш.
+//   Есть хотя бы одно → SelectOrSpawn.
 public class GameController : MonoBehaviour
 {
+    private const int MaxPieces = 3;
+
     [Header("References")]
     public DiceController dice;
     public BoardGenerator board;
     public GameObject piecePrefab;
     public VictoryCondition victoryCondition;
-
-    [Header("Systems")]
-    public TrailSystem trailSystem;
-    public PrioritySystem prioritySystem;
     public InactivitySystem inactivitySystem;
-
 
     public GameState State { get; private set; } = GameState.Initializing;
     public int CurrentDiceValue { get; private set; }
@@ -31,73 +39,108 @@ public class GameController : MonoBehaviour
     public System.Action OnTurnEnded;
     public System.Action<VictoryCondition.VictoryResult> OnGameOver;
     public System.Action<Piece> OnEnteredCenter;
+    public System.Action OnLoss;
 
     private readonly List<Piece> pieces = new();
-    private Piece lastMovedPiece;
-
+    private readonly MoveRangePlanner moveRangePlanner = new();
+    private readonly List<MoveOption> selectedMoveOptions = new();
+    private readonly List<TileInstance> highlightedTiles = new();
     private int nextCenterSlot;
+    private Piece selectedPiece;
 
     private void Start()
     {
         board.Init();
+
         dice.OnDiceRolled += OnDiceRolled;
         dice.CanRoll = () => State == GameState.WaitingRoll;
 
         victoryCondition.Init(board);
         victoryCondition.OnVictory += HandleVictory;
+        OnEnteredCenter += OnPieceEnteredCenter;
 
-        SpawnFirstPiece();
-
-        nextCenterSlot = board.CenterPath.Count - 1; // стартуем с дальнего конца центра
+        nextCenterSlot = board.CenterPath.Count - 1;
     }
 
     public void StartGame()
     {
         if (State != GameState.Initializing) return;
-
         State = GameState.WaitingRoll;
         OnGameStarted?.Invoke();
-
         Debug.Log("[Game] Started");
     }
 
-    private void OnDiceRolled(int value)
+    // ── Бросок кубика ─────────────────────────────────────────
+
+    private void OnDiceRolled(int rawValue)
     {
         if (State != GameState.WaitingRoll) return;
 
-        CurrentDiceValue = value;
+        ClearMoveSelection();
+        CurrentDiceValue = rawValue;
 
-        bool canSpawn = CurrentDiceValue == 6
-            && !board.GetTile(board.PerimeterPath[board.startIndex]).IsOccupied();
-
-        if (!canSpawn && !HasAnyValidMoves(CurrentDiceValue))
+        // ── Режим ожидания: нет активных фигур ──
+        // Бросаем пока не выпадет 6, штрафов нет, проигрыша нет.
+        if (ActivePieceCount() == 0)
         {
-            Debug.Log($"[Game] No valid moves for dice {value} -- skipping turn");
-            EndTurn(null);
+            if (rawValue == 6 && !board.GetTile(board.PerimeterPath[board.startIndex]).IsOccupied())
+            {
+                // Спавн первой фигуры
+                State = GameState.SelectOrSpawn;
+                // Сразу обрабатываем как клик на старт
+                OnStartTileClicked();
+            }
+            else
+            {
+                // Не 6 — просто ждём следующего броска
+                Debug.Log($"[Game] No active pieces, waiting for 6 (rolled {rawValue})");
+                State = GameState.WaitingRoll;
+                OnTurnEnded?.Invoke();
+            }
+            return;
+        }
+
+        // ── Режим игры: есть активные фигуры ──
+        // Проигрыш только если нет ни одного валидного действия.
+        if (!HasAnyValidAction(rawValue))
+        {
+            Debug.Log($"[Game] LOSS — no valid actions for dice {rawValue}");
+            HandleLoss();
             return;
         }
 
         State = GameState.SelectOrSpawn;
     }
 
-    private void SpawnFirstPiece()
-    {
-        TileInstance startTile = board.GetTile(board.PerimeterPath[board.startIndex]);
-        if (startTile.IsOccupied()) return;
+    // ── Клики ─────────────────────────────────────────────────
 
-        CreatePiece();
-        Debug.Log("[Game] First piece spawned");
+    public void OnTileClicked(TileInstance tile)
+    {
+        if (State != GameState.SelectOrSpawn) return;
+
+        if (TryExecuteSelectedMove(tile))
+            return;
+
+        if (tile.isStartCorner)
+            OnStartTileClicked();
     }
 
     public void OnStartTileClicked()
     {
         if (State != GameState.SelectOrSpawn) return;
+        ClearMoveSelection();
+
         if (CurrentDiceValue != 6) return;
+        if (ActivePieceCount() >= MaxPieces)
+        {
+            Debug.Log($"[Game] Max active pieces ({MaxPieces}) reached");
+            return;
+        }
 
         TileInstance startTile = board.GetTile(board.PerimeterPath[board.startIndex]);
         if (startTile.IsOccupied())
         {
-            Debug.Log("[Game] Start tile occupied -- cannot spawn");
+            Debug.Log("[Game] Start tile occupied");
             return;
         }
 
@@ -108,43 +151,106 @@ public class GameController : MonoBehaviour
     public void OnPieceClicked(Piece piece)
     {
         if (State != GameState.SelectOrSpawn) return;
-        if (CurrentDiceValue == 0) return;
         if (piece.IsFinished) return;
-        if (!piece.CanMove(CurrentDiceValue)) return;
 
-         // 🟨 Конфликт Приоритетов: если обязаны двигать приоритетную — блокируем другие
-        if (prioritySystem.MustMovePriority() && piece != prioritySystem.GetPriorityPiece())
+        int maxSteps = MaxSelectableSteps(piece, CurrentDiceValue);
+
+        if (maxSteps <= 0)
         {
-            prioritySystem.TriggerAttentionPulse(); // ← добавить
-            Debug.Log($"[Priority] Must move priority piece: {prioritySystem.GetPriorityPiece()?.name}");
+            piece.Visuals?.SetState(PieceVisualState.Penalty);
+            Debug.Log($"[Game] {piece.name} range max = {maxSteps}, can't move");
             return;
         }
 
-        // 🟥 Конфликт Времени: применяем штраф за бездействие
-        int steps = inactivitySystem.ApplyPenalty(piece, CurrentDiceValue);
-        
-        if (!piece.CanMove(steps))
+        List<MoveOption> options = moveRangePlanner.BuildOptions(
+            piece,
+            CurrentDiceValue,
+            inactivitySystem.GetPenalty(piece),
+            board
+        );
+
+        if (options.Count == 0)
         {
-            // Попробуем хотя бы 1 шаг если штраф срезал слишком много
-            if (steps > 1 && piece.CanMove(1)) steps = 1;
-            else return;
+            Debug.Log($"[Game] {piece.name} has no legal move in range [1..{maxSteps}]");
+            return;
         }
 
+        SelectPieceMoveOptions(piece, options);
+    }
+
+    private void SelectPieceMoveOptions(Piece piece, List<MoveOption> options)
+    {
+        ClearMoveSelection();
+
+        selectedPiece = piece;
+        selectedMoveOptions.AddRange(options);
+
+        TileInstance currentTile = board.GetTile(board.GetPiecePosition(piece));
+        currentTile.SetHighlight(TileHighlight.Selected);
+        highlightedTiles.Add(currentTile);
+
+        foreach (var option in selectedMoveOptions)
+        {
+            TileInstance tile = board.GetTile(option.destination);
+            if (highlightedTiles.Contains(tile)) continue;
+
+            tile.SetHighlight(TileHighlight.Available);
+            highlightedTiles.Add(tile);
+        }
+
+        int maxSteps = MaxSelectableSteps(piece, CurrentDiceValue);
+        Debug.Log($"[Game] Selected {piece.name}, range [1..{maxSteps}], legal options: {selectedMoveOptions.Count}");
+    }
+
+    private bool TryExecuteSelectedMove(TileInstance tile)
+    {
+        if (selectedPiece == null || selectedMoveOptions.Count == 0)
+            return false;
+
+        for (int i = 0; i < selectedMoveOptions.Count; i++)
+        {
+            MoveOption option = selectedMoveOptions[i];
+            if (board.GetTile(option.destination) != tile)
+                continue;
+
+            ExecuteMove(option);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void ExecuteMove(MoveOption option)
+    {
+        ClearMoveSelection();
+
         State = GameState.Moving;
-        lastMovedPiece = piece;
         CurrentDiceValue = 0;
 
-        piece.Move(steps);
+        option.piece.Move(option.steps);
     }
-    
-    // Вызывается из Piece по окончании движения
-    public void NotifyMoveFinished(Piece piece, Vector2Int fromPos)
+
+    private void ClearMoveSelection()
     {
-        // Назначение слота убрано отсюда — теперь в OnPieceEnteredCenter
-        TileInstance tile = board.GetTile(fromPos);
-        trailSystem.RegisterTrail(fromPos, tile);
+        foreach (var tile in highlightedTiles)
+        {
+            if (tile == null) continue;
+            tile.SetHighlight(tile.IsOccupied() ? TileHighlight.Occupied : TileHighlight.Normal);
+        }
+
+        highlightedTiles.Clear();
+        selectedMoveOptions.Clear();
+        selectedPiece = null;
+    }
+
+    // ── Уведомление от Piece ──────────────────────────────────
+
+    public void NotifyMoveFinished(Piece piece, Vector2Int _fromPos)
+    {
         EndTurn(piece);
     }
+
+    // ── Спавн ─────────────────────────────────────────────────
 
     private void CreatePiece()
     {
@@ -156,59 +262,104 @@ public class GameController : MonoBehaviour
         piece.Init(board, this);
         piece.PlaceAtStart(board.startIndex);
 
-        OnEnteredCenter += OnPieceEnteredCenter;
         board.GetTile(startPos).SetPiece(piece);
         pieces.Add(piece);
 
-        // Регистрируем в системе бездействия
         inactivitySystem.RegisterPiece(piece);
     }
 
     private void OnPieceEnteredCenter(Piece piece)
     {
-        if (piece.assignedCenterSlot >= 0) return; // уже назначен, игнорируем повторные входы
-
+        if (piece.assignedCenterSlot >= 0) return;
         piece.AssignCenterSlot(nextCenterSlot);
-        nextCenterSlot = Mathf.Max(0, nextCenterSlot - 1); // двигаемся от конца к началу центра
-        Debug.Log($"[Game] {piece.name} entered center, assigned slot {piece.assignedCenterSlot}");
+        nextCenterSlot = Mathf.Max(0, nextCenterSlot - 1);
+        Debug.Log($"[Game] {piece.name} assigned center slot {piece.assignedCenterSlot}");
     }
+
+    // ── Конец хода ────────────────────────────────────────────
 
     private void EndTurn(Piece movedPiece)
     {
+        ClearMoveSelection();
         CurrentDiceValue = 0;
 
-        // Обновляем системы конфликтов
         if (movedPiece != null)
-        {
-            prioritySystem.OnTurnEnd(movedPiece, pieces, board);
             inactivitySystem.OnTurnEnd(movedPiece, pieces);
-        }
 
-        trailSystem.TickDown();
-        // Проверка победы до смены состояния.
-        // Если HandleVictory уже перевёл в GameOver -- не перезаписываем WaitingRoll.
+        RefreshPenaltyDisplays();
+
         victoryCondition.CheckAfterTurn();
-
         if (State == GameState.GameOver) return;
 
         State = GameState.WaitingRoll;
         OnTurnEnded?.Invoke();
     }
 
+    // ── Победа / Проигрыш ─────────────────────────────────────
+
     private void HandleVictory(VictoryCondition.VictoryResult result)
     {
         State = GameState.GameOver;
-        Debug.Log($"[Game] Victory! Center filled in {result.turnsElapsed} turns.");
+        Debug.Log($"[Game] Victory in {result.turnsElapsed} turns.");
         OnGameOver?.Invoke(result);
     }
 
-    public bool HasAnyValidMoves(int diceValue)
+    private void HandleLoss()
     {
-        foreach (var piece in pieces)
+        State = GameState.GameOver;
+        OnLoss?.Invoke();
+        OnGameOver?.Invoke(new VictoryCondition.VictoryResult { turnsElapsed = -1 });
+    }
+
+    // ── Валидация действий ────────────────────────────────────
+
+    // Вызывается только когда ActivePieceCount() >= 1.
+    // Спавн считается валидным действием даже если все активные заблокированы штрафами.
+    private bool HasAnyValidAction(int dice)
+    {
+        // Спавн?
+        if (dice == 6
+            && ActivePieceCount() < MaxPieces
+            && !board.GetTile(board.PerimeterPath[board.startIndex]).IsOccupied())
         {
-            if (!piece.IsFinished && piece.CanMove(diceValue))
+            return true;
+        }
+
+        // Движение хотя бы одной фигуры?
+        foreach (var p in pieces)
+        {
+            if (p == null || p.IsFinished) continue;
+            if (moveRangePlanner.HasAnyOption(p, dice, inactivitySystem.GetPenalty(p), board))
                 return true;
         }
+
         return false;
+    }
+
+    private int MaxSelectableSteps(Piece piece, int dice)
+        => moveRangePlanner.GetMaxSteps(dice, inactivitySystem.GetPenalty(piece));
+
+    // ── Визуал штрафов ────────────────────────────────────────
+
+    private void RefreshPenaltyDisplays()
+    {
+        foreach (var p in pieces)
+        {
+            if (p == null) continue;
+            int penalty = inactivitySystem.GetPenalty(p);
+            p.Visuals?.SetPenaltyDisplay(penalty);
+        }
+    }
+
+    // ── Хелперы ───────────────────────────────────────────────
+
+    public bool CanSpawnMore() => ActivePieceCount() < MaxPieces;
+
+    private int ActivePieceCount()
+    {
+        int count = 0;
+        foreach (var p in pieces)
+            if (p != null && !p.IsFinished) count++;
+        return count;
     }
 }
