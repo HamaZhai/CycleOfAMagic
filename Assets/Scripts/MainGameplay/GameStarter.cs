@@ -29,12 +29,16 @@ public class GameStarter : MonoBehaviour
 
         // Подписываемся на событие старта чтобы скрыть экран
         gameController.OnGameStarted += OnGameStarted;
+        gameController.OnGameOver += OnGameOver;
     }
 
     private void OnDestroy()
     {
         if (gameController != null)
+        {
             gameController.OnGameStarted -= OnGameStarted;
+            gameController.OnGameOver -= OnGameOver;
+        }
     }
 
     // Вызывается кнопкой из UI
@@ -47,6 +51,12 @@ public class GameStarter : MonoBehaviour
     {
         if (startScreen != null)
             startScreen.SetActive(false);
+    }
+
+    private void OnGameOver(VictoryCondition.VictoryResult _)
+    {
+        if (startScreen != null)
+            startScreen.SetActive(true);
     }
 
     // Для тестирования в редакторе — старт по пробелу

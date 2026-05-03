@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public struct MoveState
 {
@@ -59,7 +60,11 @@ public class Piece : MonoBehaviour
 
     public void HandleClick()
     {
-        game.OnPieceClicked(this);
+        bool additiveSelection =
+            Keyboard.current != null &&
+            (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+
+        game.OnPieceClicked(this, additiveSelection);
     }
 
     public bool CanMove(int steps) => board.CanMove(this, steps);

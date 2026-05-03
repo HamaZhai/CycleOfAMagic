@@ -10,15 +10,62 @@ public struct MoveOption
 
 public class MoveRangePlanner
 {
+    private const int SingleActivePieceRangePenalty = 2;
+    public const int MinDistributionPieces = 2;
+    public const int MaxDistributionPieces = 3;
+
     public int GetMaxSteps(int diceValue, int penalty)
     {
         return diceValue - penalty;
     }
 
+    public int GetSingleMoveMaxSteps(int diceValue, int penalty, int activePieceCount)
+    {
+        int maxSteps = diceValue - penalty;
+        if (maxSteps <= 0)
+            return maxSteps;
+
+        if (activePieceCount == 1)
+            maxSteps = ApplySingleActivePieceLimit(maxSteps);
+
+        return maxSteps;
+    }
+
+    public bool IsValidDistributionPieceCount(int pieceCount)
+    {
+        return pieceCount >= MinDistributionPieces && pieceCount <= MaxDistributionPieces;
+    }
+
+    public int GetDistributionMaxSteps(int diceValue, IReadOnlyList<Piece> selectedPieces, InactivitySystem inactivitySystem)
+    {
+        if (selectedPieces == null || !IsValidDistributionPieceCount(selectedPieces.Count))
+            return 0;
+
+        int totalPenalty = 0;
+        foreach (var piece in selectedPieces)
+        {
+            if (piece == null || piece.IsFinished)
+                continue;
+
+            totalPenalty += inactivitySystem.GetPenalty(piece);
+        }
+
+        return diceValue - totalPenalty;
+    }
+
+    private int ApplySingleActivePieceLimit(int maxSteps)
+    {
+        return Mathf.Max(1, maxSteps - SingleActivePieceRangePenalty);
+    }
+
     public List<MoveOption> BuildOptions(Piece piece, int diceValue, int penalty, BoardGenerator board)
     {
+        return BuildOptions(piece, GetMaxSteps(diceValue, penalty), board);
+    }
+
+    public List<MoveOption> BuildOptions(Piece piece, int maxSteps, BoardGenerator board)
+    {
         var options = new List<MoveOption>();
-        int maxSteps = GetMaxSteps(diceValue, penalty);
 
         if (piece == null || piece.IsFinished || maxSteps <= 0)
             return options;

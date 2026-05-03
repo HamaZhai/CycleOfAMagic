@@ -1,64 +1,85 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Система инерции фигур — v0.5
-//
-// Если фигура НЕ двигалась N ходов подряд:
-//   idle = 1 → штраф -1 к броску
-//   idle = 2 → штраф -2 к броску
-//   (и т.д. — штраф = кол-во пропущенных ходов)
-//
-// Штраф применяется к ИТОГОВОМУ броску, не к шагам конкретной фигуры.
-// Если итог ≤ 0 — GameController объявляет проигрыш.
-//
-// Визуал: фигура с активным штрафом пульсирует оранжевым при выборе.
 public class InactivitySystem : MonoBehaviour
 {
     private readonly Dictionary<Piece, int> idleTurns = new();
+    private readonly Dictionary<Piece, int> instabilityTurns = new();
 
     public void RegisterPiece(Piece piece)
     {
         idleTurns[piece] = 0;
+        instabilityTurns.Remove(piece);
     }
 
     public void UnregisterPiece(Piece piece)
     {
         idleTurns.Remove(piece);
+        instabilityTurns.Remove(piece);
     }
 
-    // Вызывается после каждого хода. Обновляет счётчики всех активных фигур.
-    public void OnTurnEnd(Piece movedPiece, List<Piece> allPieces)
+    public void Clear()
     {
-        foreach (var p in allPieces)
+        idleTurns.Clear();
+        instabilityTurns.Clear();
+    }
+
+    public void MarkUnstable(IReadOnlyCollection<Piece> unstablePieces)
+    {
+        if (unstablePieces == null)
+            return;
+
+        foreach (var piece in unstablePieces)
         {
-            if (p == null || p.IsFinished) continue;
+            if (piece == null || piece.IsFinished)
+                continue;
 
-            if (!idleTurns.ContainsKey(p))
-                idleTurns[p] = 0;
-
-            if (p == movedPiece)
-            {
-                idleTurns[p] = 0;
-            }
-            else
-            {
-                idleTurns[p]++;
-                Debug.Log($"[Inactivity] {p.name} idle {idleTurns[p]} turn(s) → penalty -{idleTurns[p]}");
-            }
+            instabilityTurns[piece] = 1;
+            Debug.Log($"[Inactivity] {piece.name} unstable for next turn");
         }
     }
 
-    // Возвращает суммарный штраф для выбранной фигуры.
-    // Штраф = кол-во ходов простоя (idle turns).
-    // Если штраф > 0 — запускает визуальный сигнал на фигуре.
-    public int GetPenalty(Piece piece)
+    public void OnTurnEnd(Piece movedPiece, List<Piece> allPieces)
     {
-        if (!idleTurns.TryGetValue(piece, out int idle)) return 0;
-        return idle; // штраф = idle напрямую
+        var movedPieces = new HashSet<Piece>();
+        if (movedPiece != null)
+            movedPieces.Add(movedPiece);
+
+        OnTurnEnd(movedPieces, allPieces);
     }
 
-    // Применяет штраф к броску и возвращает итоговое значение.
-    // Итог может быть ≤ 0 — GameController должен проверить это и объявить проигрыш.
+    public void OnTurnEnd(IReadOnlyCollection<Piece> movedPieces, List<Piece> allPieces)
+    {
+        foreach (var piece in allPieces)
+        {
+            if (piece == null || piece.IsFinished)
+                continue;
+
+            if (!idleTurns.ContainsKey(piece))
+                idleTurns[piece] = 0;
+
+            if (WasMovedThisTurn(piece, movedPieces))
+            {
+                idleTurns[piece] = 0;
+            }
+            else
+            {
+                idleTurns[piece]++;
+                Debug.Log($"[Inactivity] {piece.name} idle {idleTurns[piece]} turn(s), penalty -{idleTurns[piece]}");
+            }
+
+            TickInstability(piece);
+        }
+    }
+
+    public int GetPenalty(Piece piece)
+    {
+        if (!idleTurns.TryGetValue(piece, out int idle))
+            return 0;
+
+        return idle + GetInstabilityPenalty(piece);
+    }
+
     public int ApplyPenalty(Piece piece, int diceValue)
     {
         int penalty = GetPenalty(piece);
@@ -67,12 +88,45 @@ public class InactivitySystem : MonoBehaviour
         int result = diceValue - penalty;
         Debug.Log($"[Inactivity] {piece.name} penalized: {diceValue} - {penalty} = {result}");
 
-        // Показываем штраф визуально
         piece.Visuals?.SetState(PieceVisualState.Penalty);
 
         return result;
     }
 
     public int GetIdleTurns(Piece piece) =>
-        idleTurns.TryGetValue(piece, out int v) ? v : 0;
+        idleTurns.TryGetValue(piece, out int value) ? value : 0;
+
+    public bool IsUnstable(Piece piece) =>
+        instabilityTurns.TryGetValue(piece, out int turns) && turns > 0;
+
+    private int GetInstabilityPenalty(Piece piece)
+    {
+        return IsUnstable(piece) ? 1 : 0;
+    }
+
+    private void TickInstability(Piece piece)
+    {
+        if (!instabilityTurns.TryGetValue(piece, out int turns))
+            return;
+
+        turns--;
+        if (turns <= 0)
+            instabilityTurns.Remove(piece);
+        else
+            instabilityTurns[piece] = turns;
+    }
+
+    private bool WasMovedThisTurn(Piece piece, IReadOnlyCollection<Piece> movedPieces)
+    {
+        if (movedPieces == null)
+            return false;
+
+        foreach (var movedPiece in movedPieces)
+        {
+            if (movedPiece == piece)
+                return true;
+        }
+
+        return false;
+    }
 }
