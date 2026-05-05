@@ -22,6 +22,7 @@ public class PieceVisuals : MonoBehaviour
     [Header("Colors")]
     [SerializeField] private Color idleColor = Color.white;
     [SerializeField] private Color penaltyColor = new Color(1f, 0.5f, 0f, 1f);
+    [SerializeField] private Color debtColor = Color.yellow;
     [SerializeField] private Color finishedColor = new Color(0.5f, 0.5f, 1f, 1f);
 
     [Header("Timing")]
@@ -33,7 +34,11 @@ public class PieceVisuals : MonoBehaviour
     // Назначь TextMeshPro дочерний объект в префабе фигуры.
     // Он будет показывать "-1", "-2" и т.д. над спрайтом.
     [SerializeField] private TextMeshPro penaltyLabel;
-    [SerializeField] private Vector3 labelOffset = new Vector3(0f, 0.55f, -0.1f);
+    [SerializeField] private Vector3 labelOffset = new Vector3(-0.22f, 0.7f, -0.1f);
+
+    [Header("Debt Label")]
+    [SerializeField] private TextMeshPro debtLabel;
+    [SerializeField] private Vector3 debtLabelOffset = new Vector3(0.22f, 0.7f, -0.1f);
 
     private SpriteRenderer sr;
     private PieceVisualState currentState = PieceVisualState.Idle;
@@ -47,7 +52,11 @@ public class PieceVisuals : MonoBehaviour
         if (penaltyLabel == null)
             penaltyLabel = CreatePenaltyLabel();
 
+        if (debtLabel == null)
+            debtLabel = CreateDebtLabel();
+
         penaltyLabel.gameObject.SetActive(false);
+        debtLabel.gameObject.SetActive(false);
     }
 
     // ── Состояние фигуры ──────────────────────────────────────
@@ -80,6 +89,7 @@ public class PieceVisuals : MonoBehaviour
             case PieceVisualState.Finished:
                 sr.DOColor(finishedColor, fadeDuration);
                 penaltyLabel.gameObject.SetActive(false);
+                debtLabel.gameObject.SetActive(false);
                 break;
         }
     }
@@ -108,6 +118,25 @@ public class PieceVisuals : MonoBehaviour
 
     public PieceVisualState CurrentState => currentState;
 
+    public void SetDebtDisplay(int debt)
+    {
+        if (currentState == PieceVisualState.Finished)
+            return;
+
+        if (debt <= 0)
+        {
+            debtLabel.gameObject.SetActive(false);
+            return;
+        }
+
+        debtLabel.gameObject.SetActive(true);
+        debtLabel.text = debt.ToString();
+
+        debtLabel.transform.DOKill();
+        debtLabel.transform.localScale = Vector3.one * 1.25f;
+        debtLabel.transform.DOScale(Vector3.one, 0.2f).SetEase(Ease.OutBack);
+    }
+
     // ── Вспомогательное ──────────────────────────────────────
 
     private TextMeshPro CreatePenaltyLabel()
@@ -129,9 +158,28 @@ public class PieceVisuals : MonoBehaviour
         return tmp;
     }
 
+    private TextMeshPro CreateDebtLabel()
+    {
+        var go = new GameObject("DebtLabel");
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = debtLabelOffset;
+
+        var tmp = go.AddComponent<TextMeshPro>();
+        tmp.fontSize = 2.8f;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.color = debtColor;
+
+        var mr = go.GetComponent<MeshRenderer>();
+        if (mr != null) mr.sortingOrder = 11;
+
+        return tmp;
+    }
+
     private void OnDestroy()
     {
         sr?.DOKill();
         penaltyLabel?.transform.DOKill();
+        debtLabel?.transform.DOKill();
     }
 }

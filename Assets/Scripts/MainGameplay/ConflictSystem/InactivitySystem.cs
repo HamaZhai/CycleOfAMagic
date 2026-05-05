@@ -3,39 +3,44 @@ using UnityEngine;
 
 public class InactivitySystem : MonoBehaviour
 {
+    private const int IdlePenaltyPerTurn = 1;
+    private const int DistributionDebtGain = 1;
+
     private readonly Dictionary<Piece, int> idleTurns = new();
-    private readonly Dictionary<Piece, int> instabilityTurns = new();
+    private readonly Dictionary<Piece, int> debt = new();
 
     public void RegisterPiece(Piece piece)
     {
         idleTurns[piece] = 0;
-        instabilityTurns.Remove(piece);
+        debt.Remove(piece);
     }
 
     public void UnregisterPiece(Piece piece)
     {
         idleTurns.Remove(piece);
-        instabilityTurns.Remove(piece);
+        debt.Remove(piece);
     }
 
     public void Clear()
     {
         idleTurns.Clear();
-        instabilityTurns.Clear();
+        debt.Clear();
     }
 
-    public void MarkUnstable(IReadOnlyCollection<Piece> unstablePieces)
+    public void AddDebt(IReadOnlyCollection<Piece> debtPieces)
     {
-        if (unstablePieces == null)
+        if (debtPieces == null)
             return;
 
-        foreach (var piece in unstablePieces)
+        foreach (var piece in debtPieces)
         {
             if (piece == null || piece.IsFinished)
                 continue;
 
-            instabilityTurns[piece] = 1;
-            Debug.Log($"[Inactivity] {piece.name} unstable for next turn");
+            debt[piece] = DistributionDebtGain;
+            piece.Visuals?.SetDebtDisplay(GetDebt(piece));
+            piece.Visuals?.SetPenaltyDisplay(GetIdlePenalty(piece));
+            Debug.Log($"[Inactivity] {piece.name} debt +{DistributionDebtGain}, total debt {debt[piece]}");
         }
     }
 
@@ -61,23 +66,22 @@ public class InactivitySystem : MonoBehaviour
             if (WasMovedThisTurn(piece, movedPieces))
             {
                 idleTurns[piece] = 0;
+                ClearDebt(piece);
             }
             else
             {
                 idleTurns[piece]++;
-                Debug.Log($"[Inactivity] {piece.name} idle {idleTurns[piece]} turn(s), penalty -{idleTurns[piece]}");
+                Debug.Log($"[Inactivity] {piece.name} idle {idleTurns[piece]} turn(s), penalty -{GetPenalty(piece)}");
             }
-
-            TickInstability(piece);
         }
     }
 
     public int GetPenalty(Piece piece)
     {
         if (!idleTurns.TryGetValue(piece, out int idle))
-            return 0;
+            return GetDebt(piece);
 
-        return idle + GetInstabilityPenalty(piece);
+        return GetIdlePenalty(piece) + GetDebt(piece);
     }
 
     public int ApplyPenalty(Piece piece, int diceValue)
@@ -96,24 +100,20 @@ public class InactivitySystem : MonoBehaviour
     public int GetIdleTurns(Piece piece) =>
         idleTurns.TryGetValue(piece, out int value) ? value : 0;
 
-    public bool IsUnstable(Piece piece) =>
-        instabilityTurns.TryGetValue(piece, out int turns) && turns > 0;
+    public int GetIdlePenalty(Piece piece) =>
+        GetIdleTurns(piece) * IdlePenaltyPerTurn;
 
-    private int GetInstabilityPenalty(Piece piece)
-    {
-        return IsUnstable(piece) ? 1 : 0;
-    }
+    public int GetDebt(Piece piece) =>
+        debt.TryGetValue(piece, out int value) ? value : 0;
 
-    private void TickInstability(Piece piece)
+    public bool HasDebt(Piece piece) => GetDebt(piece) > 0;
+
+    private void ClearDebt(Piece piece)
     {
-        if (!instabilityTurns.TryGetValue(piece, out int turns))
+        if (!debt.Remove(piece))
             return;
 
-        turns--;
-        if (turns <= 0)
-            instabilityTurns.Remove(piece);
-        else
-            instabilityTurns[piece] = turns;
+        piece.Visuals?.SetDebtDisplay(0);
     }
 
     private bool WasMovedThisTurn(Piece piece, IReadOnlyCollection<Piece> movedPieces)

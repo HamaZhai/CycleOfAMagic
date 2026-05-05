@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class DiceController : MonoBehaviour
@@ -15,6 +16,12 @@ public class DiceController : MonoBehaviour
 
     public System.Action<int> OnDiceRolled;
     public System.Func<bool> CanRoll;
+
+    private void Update()
+    {
+        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+            OnDiceClicked();
+    }
 
     public void OnDiceClicked()
     {

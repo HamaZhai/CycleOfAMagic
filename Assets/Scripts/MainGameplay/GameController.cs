@@ -58,7 +58,7 @@ public class GameController : MonoBehaviour
     private readonly List<Piece> distributionPieces = new();
     private readonly List<Piece> movedDistributionOrder = new();
     private readonly HashSet<Piece> movedDistributionPieces = new();
-    private readonly List<Piece> pendingInstabilityPieces = new();
+    private readonly List<Piece> pendingDebtPieces = new();
     private int nextCenterSlot;
     private Piece selectedPiece;
     private bool executingDistributionMove;
@@ -213,8 +213,7 @@ public class GameController : MonoBehaviour
         if (maxSteps <= 0)
         {
             piece.Visuals?.SetState(PieceVisualState.Penalty);
-            Debug.Log($"[Game] LOSS — {piece.name} range max = {maxSteps}");
-            HandleLoss();
+            Debug.Log($"[Game] {piece.name} range max = {maxSteps}, choose another action");
             return;
         }
 
@@ -342,7 +341,7 @@ public class GameController : MonoBehaviour
                 return;
             }
 
-            QueueDistributionInstability();
+            QueueDistributionDebt();
             EndTurn(new HashSet<Piece>(movedDistributionPieces));
             return;
         }
@@ -403,10 +402,10 @@ public class GameController : MonoBehaviour
         if (movedPieces != null)
             inactivitySystem.OnTurnEnd(movedPieces, pieces);
 
-        if (pendingInstabilityPieces.Count > 0)
+        if (pendingDebtPieces.Count > 0)
         {
-            inactivitySystem.MarkUnstable(pendingInstabilityPieces);
-            pendingInstabilityPieces.Clear();
+            inactivitySystem.AddDebt(pendingDebtPieces);
+            pendingDebtPieces.Clear();
         }
 
         RefreshPenaltyDisplays();
@@ -564,22 +563,22 @@ public class GameController : MonoBehaviour
         executingDistributionMove = false;
     }
 
-    private void QueueDistributionInstability()
+    private void QueueDistributionDebt()
     {
-        pendingInstabilityPieces.Clear();
+        pendingDebtPieces.Clear();
 
         if (distributionPieces.Count == 2)
         {
-            pendingInstabilityPieces.AddRange(distributionPieces);
+            pendingDebtPieces.AddRange(distributionPieces);
             return;
         }
 
         if (distributionPieces.Count == 3)
         {
-            for (int i = 0; i < movedDistributionOrder.Count && pendingInstabilityPieces.Count < 2; i++)
-                pendingInstabilityPieces.Add(movedDistributionOrder[i]);
+            for (int i = 0; i < movedDistributionOrder.Count && pendingDebtPieces.Count < 2; i++)
+                pendingDebtPieces.Add(movedDistributionOrder[i]);
 
-            Debug.Log("[Game] Three-piece distribution: first two moved pieces become unstable");
+            Debug.Log("[Game] Three-piece distribution: first two moved pieces receive debt");
         }
     }
 
@@ -650,7 +649,7 @@ public class GameController : MonoBehaviour
         distributionPieces.Clear();
         movedDistributionOrder.Clear();
         movedDistributionPieces.Clear();
-        pendingInstabilityPieces.Clear();
+        pendingDebtPieces.Clear();
         executingDistributionMove = false;
     }
 
@@ -661,8 +660,9 @@ public class GameController : MonoBehaviour
         foreach (var p in pieces)
         {
             if (p == null) continue;
-            int penalty = inactivitySystem.GetPenalty(p);
+            int penalty = inactivitySystem.GetIdlePenalty(p);
             p.Visuals?.SetPenaltyDisplay(penalty);
+            p.Visuals?.SetDebtDisplay(inactivitySystem.GetDebt(p));
         }
     }
 

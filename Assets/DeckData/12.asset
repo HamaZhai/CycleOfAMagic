@@ -13,11 +13,8 @@ MonoBehaviour:
   m_Name: 12
   m_EditorClassIdentifier: Assembly-CSharp::BoardManager
   boardSize: 12
-  cornerTile:
-    tileName: Corner
-    zone: 0
-    effect: 
-  defaultTilePrefab: {fileID: 7741288560753764945, guid: 13c96cf0287fa8c4fbff22f802c42e46, type: 3}
+  defaultTilePrefab: {fileID: 7741288560753764945, guid: a7a9b14a5d364c94da741f40e9b9de04, type: 3}
+  cornerTilePrefab: {fileID: 7741288560753764945, guid: 13c96cf0287fa8c4fbff22f802c42e46, type: 3}
   startDeck:
   - tileName: Start_0
     zone: 1
